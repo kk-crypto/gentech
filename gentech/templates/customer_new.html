@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card small">
+  <h2>Add New Customer</h2>
+  <form method="post">
+    <label>Customer Name</label>
+    <input name="name" required />
+
+    <label>Address</label>
+    <textarea name="address" rows="3" required></textarea>
+
+    <label>Customer GSTIN</label>
+    <input name="gstin" required />
+
+    <label>Reference</label>
+    <input name="reference_default" required />
+
+    <button type="submit" class="btn-primary">Save Customer</button>
+  </form>
+</section>
+{% endblock %}

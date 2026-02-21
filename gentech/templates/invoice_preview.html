@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <div class="preview-header">
+    <div>
+      <h2>Invoice Preview</h2>
+      <p>
+        <strong>Header:</strong>
+        {% if invoice.include_letterhead %}Included{% else %}Hidden (watermark kept){% endif %}
+      </p>
+      <p class="muted">Preview number: {{ invoice.preview.invoice_no }} | Job Card: {{ invoice.preview.job_card_no }}</p>
+    </div>
+    <a class="inline-link" href="{{ url_for('new_invoice') }}">Back to Edit</a>
+  </div>
+
+  <form action="{{ url_for('preview_invoice') }}" method="post" class="inline-form">
+    <textarea name="payload_json" hidden>{{ payload_json }}</textarea>
+    <label class="checkbox-label">
+      <input type="checkbox" name="include_letterhead" {% if invoice.include_letterhead %}checked{% endif %} />
+      Include Letterhead/Logo
+    </label>
+    <button class="btn-secondary" type="submit">Update Preview</button>
+  </form>
+
+  <article
+    class="invoice-sheet {% if has_letterhead %}with-stationery{% endif %}"
+    {% if has_letterhead %}style="--stationery-url: url('{{ url_for('letterhead_asset') }}');"{% endif %}
+  >
+    {% if has_letterhead %}
+    <div class="header-spacer {% if not invoice.include_letterhead %}mask-header{% endif %}"></div>
+    {% else %}
+    <div class="letterhead-band">
+      {% if invoice.include_letterhead %}
+      <h3>{{ company.company_name }}</h3>
+      <p>GSTIN: {{ company.gstin }} | Mobile: {{ company.phone }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+    <div class="invoice-frame">
+      <table class="classic-table full-width">
+        <tr>
+          <td colspan="2" class="center strong large">TAX INVOICE</td>
+        </tr>
+        <tr>
+          <td class="strong">GSTIN: {{ company.gstin }}</td>
+          <td class="strong center">Original for Recipient</td>
+        </tr>
+        <tr>
+          <td class="no-padding">
+            <div class="left-box">
+              <p class="strong">Customer Details</p>
+              <p class="strong">{{ invoice.customer.name }}</p>
+              <p>{{ invoice.customer.address }}</p>
+              <p>GSTIN: {{ invoice.customer.gstin }}</p>
+              <p>Ref: {{ invoice.customer.reference }}</p>
+            </div>
+          </td>
+          <td class="no-padding">
+            <table class="classic-table nested full-width">
+              <tr><td class="label">Invoice No:</td><td>{{ invoice.preview.invoice_no }}</td></tr>
+              <tr><td class="label">Invoice Date:</td><td>{{ invoice.invoice_date }}</td></tr>
+              <tr><td class="label">Job Card No:</td><td>{{ invoice.preview.job_card_no }}</td></tr>
+              <tr><td class="label">Job Card Date:</td><td>{{ invoice.job_card_date }}</td></tr>
+              <tr><td class="label">Cust's Order No:</td><td>{{ invoice.order_no }}</td></tr>
+              <tr><td class="label">Date:</td><td>{{ invoice.order_date }}</td></tr>
+              <tr><td class="label">Delivery Terms:</td><td class="strong">{{ invoice.delivery_terms }}</td></tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+
+      <table class="classic-table line-table full-width">
+        <thead>
+          <tr>
+            <th>Sl.No</th>
+            <th>Description</th>
+            <th>Qty</th>
+            <th>HSN/SAC</th>
+            <th>Unit Price<br/>in Rs</th>
+            <th>Amount<br/>in Rs</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in invoice.rows %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ row.description }}</td>
+            <td>{{ row.qty }}</td>
+            <td>{{ row.hsn_sac }}</td>
+            <td>{{ "%.2f"|format(row.unit_price) }}</td>
+            <td>{{ "%.2f"|format(row.amount) }}</td>
+          </tr>
+          {% endfor %}
+          <tr class="total-row"><td colspan="5">Total Amount</td><td>{{ "%.2f"|format(invoice.totals.subtotal) }}</td></tr>
+          <tr><td colspan="5">CGST 9%</td><td>{{ "%.2f"|format(invoice.totals.cgst) }}</td></tr>
+          <tr><td colspan="5">SGST 9%</td><td>{{ "%.2f"|format(invoice.totals.sgst) }}</td></tr>
+          <tr><td colspan="5">Transport</td><td>{{ "%.2f"|format(invoice.totals.transport) }}</td></tr>
+          <tr class="grand-row"><td colspan="5">Grand Total</td><td>{{ "%.2f"|format(invoice.totals.grand_total) }}</td></tr>
+        </tbody>
+      </table>
+
+      <div class="footer-grid">
+        <div class="footer-left">
+          <p>Amount In words: {{ invoice.amount_in_words }}.</p>
+          <p>Mode of Payment:Cash/Cheque to <span class="strong">GENTEC.</span></p>
+          <p class="strong">Note:</p>
+          {% for note in company.notes %}
+          <p>
+            {% if loop.index == 1 %}i){% elif loop.index == 2 %}ii){% elif loop.index == 3 %}iii){% elif loop.index == 4 %}iv){% else %}{{ loop.index }}){% endif %}
+            {{ note }}
+          </p>
+          {% endfor %}
+          <p class="strong">Bank Details:-</p>
+          {% for line in company.bank_details %}
+          <p class="strong">{{ line }}</p>
+          {% endfor %}
+        </div>
+        <div class="footer-right">
+          <p class="for-gentec strong">For GENTEC</p>
+          <p class="auth strong">Authorised Signatory</p>
+          <p class="mobile">Mobile: {{ company.phone }}</p>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <form action="{{ url_for('save_invoice') }}" method="post">
+    <textarea name="payload_json" hidden>{{ payload_json }}</textarea>
+    <input type="hidden" name="include_letterhead" value="{{ 1 if invoice.include_letterhead else 0 }}" />
+    <button class="btn-primary" type="submit">Save and Generate PDF + Excel</button>
+  </form>
+</section>
+{% endblock %}

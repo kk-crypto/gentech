@@ -1,0 +1,46 @@
+{
+  "include_letterhead": false,
+  "invoice_date": "2026-02-21",
+  "job_card_date": "2026-02-21",
+  "order_no": "Verbally",
+  "order_date": "2026-02-21",
+  "delivery_terms": "work at site",
+  "customer": {
+    "name": "Saaral Family Restaurant",
+    "address": "34-F1, Karupparayan Kovil Street, Samalapuram, Palladam, Tiruppur - 641663",
+    "gstin": "33FXEPS2789N1ZL",
+    "reference": "Mahindra 15Kva"
+  },
+  "rows": [
+    {
+      "item_id": "ITEM001",
+      "description": "Fuel filter",
+      "hsn_sac": "8421",
+      "qty": 4.0,
+      "unit_price": 220.0,
+      "amount": 880.0
+    }
+  ],
+  "totals": {
+    "subtotal": 880.0,
+    "cgst": 79.2,
+    "sgst": 79.2,
+    "transport": 100.0,
+    "grand_total": 1138.4
+  },
+  "amount_in_words": "Rs. One Thousand, One Hundred And Thirty-Eight Only",
+  "preview": {
+    "sequence": 2,
+    "financial_year": "25-26",
+    "invoice_no": "DGSP-02/25-26",
+    "job_card_no": "GEN/CBE/25-26/JC002"
+  },
+  "invoice_id": "20260221204820-002",
+  "financial_year": "25-26",
+  "sequence": 2,
+  "invoice_no": "DGSP-02/25-26",
+  "job_card_no": "GEN/CBE/25-26/JC002",
+  "created_at": "2026-02-21T20:48:20",
+  "pdf_file": "data/generated/pdf/DGSP-02-25-26.pdf",
+  "xlsx_file": "data/generated/xlsx/DGSP-02-25-26.xlsx"
+}

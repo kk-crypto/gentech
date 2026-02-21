@@ -1,0 +1,54 @@
+{
+  "include_letterhead": true,
+  "invoice_date": "2026-02-21",
+  "job_card_date": "2026-02-21",
+  "order_no": "Verbally",
+  "order_date": "2026-02-21",
+  "delivery_terms": "work at site",
+  "customer": {
+    "name": "Saaral Family Restaurant",
+    "address": "34-F1, Karupparayan Kovil Street, Samalapuram, Palladam, Tiruppur - 641663",
+    "gstin": "33FXEPS2789N1ZL",
+    "reference": "Mahindra 15Kva"
+  },
+  "rows": [
+    {
+      "item_id": "ITEM001",
+      "description": "Fuel filter",
+      "hsn_sac": "8421",
+      "qty": 3.0,
+      "unit_price": 225.0,
+      "amount": 675.0
+    },
+    {
+      "item_id": "ITEM005",
+      "description": "Stop Solenoid Coil",
+      "hsn_sac": "8481",
+      "qty": 7.0,
+      "unit_price": 4842.0,
+      "amount": 33894.0
+    }
+  ],
+  "totals": {
+    "subtotal": 34569.0,
+    "cgst": 3111.21,
+    "sgst": 3111.21,
+    "transport": 0.0,
+    "grand_total": 40791.42
+  },
+  "amount_in_words": "Rs. Forty Thousand, Seven Hundred And Ninety-One Only",
+  "preview": {
+    "sequence": 7,
+    "financial_year": "25-26",
+    "invoice_no": "DGSP-07/25-26",
+    "job_card_no": "GEN/CBE/25-26/JC007"
+  },
+  "invoice_id": "20260221213412-007",
+  "financial_year": "25-26",
+  "sequence": 7,
+  "invoice_no": "DGSP-07/25-26",
+  "job_card_no": "GEN/CBE/25-26/JC007",
+  "created_at": "2026-02-21T21:34:12",
+  "pdf_file": "data/generated/pdf/DGSP-07-25-26.pdf",
+  "xlsx_file": "data/generated/xlsx/DGSP-07-25-26.xlsx"
+}

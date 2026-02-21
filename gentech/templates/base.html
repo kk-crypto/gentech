@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gentec Billing</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div>
+        <h1>Gentec Billing System</h1>
+        <p>Invoice generation with PDF + Excel export</p>
+      </div>
+      <nav>
+        <a href="{{ url_for('new_invoice') }}">New Invoice</a>
+        <a href="{{ url_for('history') }}">History</a>
+        <a href="{{ url_for('add_customer') }}">Add Customer</a>
+      </nav>
+    </header>
+
+    <main class="page-wrap">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <div class="flash-wrap">
+        {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

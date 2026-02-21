@@ -1,0 +1,54 @@
+{
+  "include_letterhead": true,
+  "invoice_date": "2026-02-21",
+  "job_card_date": "2026-02-21",
+  "order_no": "Verbally",
+  "order_date": "2026-02-21",
+  "delivery_terms": "work at site",
+  "customer": {
+    "name": "Saaral Family Restaurant",
+    "address": "34-F1, Karupparayan Kovil Street, Samalapuram, Palladam, Tiruppur - 641663",
+    "gstin": "33FXEPS2789N1ZL",
+    "reference": "Mahindra 15Kva"
+  },
+  "rows": [
+    {
+      "item_id": "ITEM004",
+      "description": "Banjo Washer",
+      "hsn_sac": "7415",
+      "qty": 3.0,
+      "unit_price": 22.0,
+      "amount": 66.0
+    },
+    {
+      "item_id": "ITEM001",
+      "description": "Fuel filter",
+      "hsn_sac": "8421",
+      "qty": 5.0,
+      "unit_price": 220.0,
+      "amount": 1100.0
+    }
+  ],
+  "totals": {
+    "subtotal": 1166.0,
+    "cgst": 104.94,
+    "sgst": 104.94,
+    "transport": 0.0,
+    "grand_total": 1375.88
+  },
+  "amount_in_words": "Rs. One Thousand, Three Hundred And Seventy-Six Only",
+  "preview": {
+    "sequence": 10,
+    "financial_year": "25-26",
+    "invoice_no": "DGSP-10/25-26",
+    "job_card_no": "GEN/CBE/25-26/JC010"
+  },
+  "invoice_id": "20260221214133-010",
+  "financial_year": "25-26",
+  "sequence": 10,
+  "invoice_no": "DGSP-10/25-26",
+  "job_card_no": "GEN/CBE/25-26/JC010",
+  "created_at": "2026-02-21T21:41:33",
+  "pdf_file": "data/generated/pdf/DGSP-10-25-26.pdf",
+  "xlsx_file": "data/generated/xlsx/DGSP-10-25-26.xlsx"
+}

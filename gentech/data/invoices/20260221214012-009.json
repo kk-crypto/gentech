@@ -1,0 +1,54 @@
+{
+  "include_letterhead": false,
+  "invoice_date": "2026-02-21",
+  "job_card_date": "2026-02-21",
+  "order_no": "Verbally",
+  "order_date": "2026-02-21",
+  "delivery_terms": "work at site",
+  "customer": {
+    "name": "Saaral Family Restaurant",
+    "address": "34-F1, Karupparayan Kovil Street, Samalapuram, Palladam, Tiruppur - 641663",
+    "gstin": "33FXEPS2789N1ZL",
+    "reference": "tetsing teh new manual etry"
+  },
+  "rows": [
+    {
+      "item_id": "ITEM002",
+      "description": "Lube Oil filter",
+      "hsn_sac": "8421",
+      "qty": 3.0,
+      "unit_price": 585.0,
+      "amount": 1755.0
+    },
+    {
+      "item_id": "ITEM003",
+      "description": "Filter O ring",
+      "hsn_sac": "8421",
+      "qty": 5.0,
+      "unit_price": 125.0,
+      "amount": 625.0
+    }
+  ],
+  "totals": {
+    "subtotal": 2380.0,
+    "cgst": 214.2,
+    "sgst": 214.2,
+    "transport": 0.0,
+    "grand_total": 2808.4
+  },
+  "amount_in_words": "Rs. Two Thousand, Eight Hundred And Eight Only",
+  "preview": {
+    "sequence": 9,
+    "financial_year": "25-26",
+    "invoice_no": "DGSP-09/25-26",
+    "job_card_no": "GEN/CBE/25-26/JC009"
+  },
+  "invoice_id": "20260221214012-009",
+  "financial_year": "25-26",
+  "sequence": 9,
+  "invoice_no": "DGSP-09/25-26",
+  "job_card_no": "GEN/CBE/25-26/JC009",
+  "created_at": "2026-02-21T21:40:12",
+  "pdf_file": "data/generated/pdf/DGSP-09-25-26.pdf",
+  "xlsx_file": "data/generated/xlsx/DGSP-09-25-26.xlsx"
+}

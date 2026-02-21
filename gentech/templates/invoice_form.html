@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Create Invoice</h2>
+  <form action="{{ url_for('preview_invoice') }}" method="post" id="invoice-form">
+    <div class="grid two-col">
+      <div>
+        <label>Customer</label>
+        <select id="customer_id">
+          <option value="">Select Customer</option>
+          {% for customer in customers %}
+          <option
+            value="{{ customer.customer_id }}"
+            data-name="{{ customer.name }}"
+            data-address="{{ customer.address }}"
+            data-gstin="{{ customer.gstin }}"
+            data-reference="{{ customer.reference_default }}"
+            {% if selected_customer == customer.customer_id %}selected{% endif %}
+          >
+            {{ customer.name }}
+          </option>
+          {% endfor %}
+        </select>
+        <a class="inline-link" href="{{ url_for('add_customer') }}">+ Add New Customer</a>
+      </div>
+      <div>
+        <label class="checkbox-label">
+          <input type="checkbox" name="include_letterhead" id="include_letterhead" />
+          Include Letterhead/Logo
+        </label>
+        <p class="muted">Unchecked keeps top space blank for pre-printed letterhead paper.</p>
+      </div>
+    </div>
+
+    <div class="grid two-col">
+      <div>
+        <label>Customer Name</label>
+        <input name="customer_name" id="customer_name" required />
+      </div>
+      <div>
+        <label>Customer GSTIN</label>
+        <input name="customer_gstin" id="customer_gstin" required />
+      </div>
+      <div class="span-2">
+        <label>Customer Address</label>
+        <textarea name="customer_address" id="customer_address" rows="2" required></textarea>
+      </div>
+      <div>
+        <label>Reference</label>
+        <select name="customer_reference_select" id="customer_reference_select">
+          <option value="NONE">None</option>
+          {% for reference in reference_options %}
+          <option value="{{ reference }}">{{ reference }}</option>
+          {% endfor %}
+          <option value="MANUAL">Manual Entry</option>
+        </select>
+        <input
+          name="customer_reference_manual"
+          id="customer_reference_manual"
+          placeholder="Enter reference manually"
+          style="display: none; margin-top: 8px;"
+        />
+      </div>
+      <div>
+        <label>Delivery Terms</label>
+        <input name="delivery_terms" value="{{ company.delivery_terms_default }}" required />
+      </div>
+    </div>
+
+    <div class="grid three-col">
+      <div>
+        <label>Invoice Date</label>
+        <input type="date" name="invoice_date" value="{{ today }}" required />
+      </div>
+      <div>
+        <label>Job Card Date</label>
+        <input type="date" name="job_card_date" value="{{ today }}" required />
+      </div>
+      <div>
+        <label>Customer Order Date</label>
+        <input type="date" name="order_date" value="{{ today }}" required />
+      </div>
+      <div>
+        <label>Cust's Order No</label>
+        <input name="order_no" value="Verbally" required />
+      </div>
+      <div>
+        <label>Transport</label>
+        <input id="transport" name="transport" value="0" />
+      </div>
+      <div>
+        <label>GSTIN (Fixed Company)</label>
+        <input value="{{ company.gstin }}" readonly />
+      </div>
+    </div>
+
+    <h3>Line Items</h3>
+    <p class="muted">Start with one line item. Add new rows as needed. Description can be selected or typed manually.</p>
+    <table class="line-items" id="line-items" data-max-rows="{{ company.max_rows_per_invoice }}">
+      <thead>
+        <tr>
+          <th>Sl.No</th>
+          <th>Description</th>
+          <th>Qty</th>
+          <th>HSN/SAC</th>
+          <th>Unit Price</th>
+          <th>Amount</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <button type="button" class="btn-secondary add-row-btn" id="add-line-item">+ Add New Item</button>
+
+    <div class="totals-panel">
+      <div><span>Total Amount:</span><strong id="total_amount">0.00</strong></div>
+      <div><span>CGST 9%:</span><strong id="cgst_total">0.00</strong></div>
+      <div><span>SGST 9%:</span><strong id="sgst_total">0.00</strong></div>
+      <div><span>Transport:</span><strong id="transport_total">0.00</strong></div>
+      <div class="grand"><span>Grand Total:</span><strong id="grand_total">0.00</strong></div>
+    </div>
+
+    <button type="submit" class="btn-primary">Preview Invoice</button>
+  </form>
+</section>
+<script id="items-master" type="application/json">{{ items|tojson }}</script>
+<script src="{{ url_for('static', filename='js/invoice_form.js') }}"></script>
+{% endblock %}

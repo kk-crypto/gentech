@@ -1,0 +1,32 @@
+[
+  {
+    "item_id": "ITEM001",
+    "description": "Fuel filter",
+    "hsn_sac": "8421",
+    "default_unit_price": 220
+  },
+  {
+    "item_id": "ITEM002",
+    "description": "Lube Oil filter",
+    "hsn_sac": "8421",
+    "default_unit_price": 585
+  },
+  {
+    "item_id": "ITEM003",
+    "description": "Filter O ring",
+    "hsn_sac": "8421",
+    "default_unit_price": 125
+  },
+  {
+    "item_id": "ITEM004",
+    "description": "Banjo Washer",
+    "hsn_sac": "7415",
+    "default_unit_price": 22
+  },
+  {
+    "item_id": "ITEM005",
+    "description": "Stop Solenoid Coil",
+    "hsn_sac": "8481",
+    "default_unit_price": 4842
+  }
+]

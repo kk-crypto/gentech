@@ -1,0 +1,46 @@
+{
+  "include_letterhead": true,
+  "invoice_date": "2026-02-21",
+  "job_card_date": "2026-02-21",
+  "order_no": "Verbally",
+  "order_date": "2026-02-21",
+  "delivery_terms": "work at site",
+  "customer": {
+    "name": "Saaral Family Restaurant",
+    "address": "34-F1, Karupparayan Kovil Street, Samalapuram, Palladam, Tiruppur - 641663",
+    "gstin": "33FXEPS2789N1ZL",
+    "reference": "Mahindra 15Kva"
+  },
+  "rows": [
+    {
+      "item_id": "ITEM002",
+      "description": "Lube Oil filter",
+      "hsn_sac": "8421",
+      "qty": 3.0,
+      "unit_price": 585.0,
+      "amount": 1755.0
+    }
+  ],
+  "totals": {
+    "subtotal": 1755.0,
+    "cgst": 157.95,
+    "sgst": 157.95,
+    "transport": 0.0,
+    "grand_total": 2070.9
+  },
+  "amount_in_words": "Rs. Two Thousand And Seventy-One Only",
+  "preview": {
+    "sequence": 6,
+    "financial_year": "25-26",
+    "invoice_no": "DGSP-06/25-26",
+    "job_card_no": "GEN/CBE/25-26/JC006"
+  },
+  "invoice_id": "20260221213024-006",
+  "financial_year": "25-26",
+  "sequence": 6,
+  "invoice_no": "DGSP-06/25-26",
+  "job_card_no": "GEN/CBE/25-26/JC006",
+  "created_at": "2026-02-21T21:30:24",
+  "pdf_file": "data/generated/pdf/DGSP-06-25-26.pdf",
+  "xlsx_file": "data/generated/xlsx/DGSP-06-25-26.xlsx"
+}
