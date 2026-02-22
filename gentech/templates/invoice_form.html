@@ -21,11 +21,14 @@
           </option>
           {% endfor %}
         </select>
-        <a class="inline-link" href="{{ url_for('add_customer') }}">+ Add New Customer</a>
+        <div class="inline-actions">
+          <a class="inline-link" href="{{ url_for('add_customer') }}">+ Add New Customer</a>
+          <a class="inline-link" href="{{ url_for('add_item') }}">+ Add New Item</a>
+        </div>
       </div>
       <div>
         <label class="checkbox-label">
-          <input type="checkbox" name="include_letterhead" id="include_letterhead" />
+          <input type="checkbox" name="include_letterhead" id="include_letterhead" checked />
           Include Letterhead/Logo
         </label>
         <p class="muted">Unchecked keeps top space blank for pre-printed letterhead paper.</p>
@@ -47,19 +50,20 @@
       </div>
       <div>
         <label>Reference</label>
-        <select name="customer_reference_select" id="customer_reference_select">
-          <option value="NONE">None</option>
-          {% for reference in reference_options %}
-          <option value="{{ reference }}">{{ reference }}</option>
-          {% endfor %}
-          <option value="MANUAL">Manual Entry</option>
-        </select>
         <input
-          name="customer_reference_manual"
-          id="customer_reference_manual"
-          placeholder="Enter reference manually"
-          style="display: none; margin-top: 8px;"
+          name="customer_reference"
+          id="customer_reference"
+          list="reference-options"
+          placeholder="Select or type reference (leave blank for None)"
+          style="margin-top: 8px;"
         />
+        <datalist id="reference-options">
+          <option value="None"></option>
+          {% for reference in reference_options %}
+          <option value="{{ reference }}"></option>
+          {% endfor %}
+        </datalist>
+        <p class="muted">Type any value if it is not in suggestions.</p>
       </div>
       <div>
         <label>Delivery Terms</label>
@@ -96,7 +100,7 @@
 
     <h3>Line Items</h3>
     <p class="muted">Start with one line item. Add new rows as needed. Description can be selected or typed manually.</p>
-    <table class="line-items" id="line-items" data-max-rows="{{ company.max_rows_per_invoice }}">
+    <table class="line-items" id="line-items" data-max-rows="{{ max_line_items }}">
       <thead>
         <tr>
           <th>Sl.No</th>

@@ -14,6 +14,8 @@ from openpyxl.drawing.image import Image as XLImage
 from openpyxl.styles import Alignment, Border, Font, Side
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -25,6 +27,7 @@ XLSX_DIR = DATA_DIR / "generated" / "xlsx"
 COMPANY_SETTINGS_PATH = DATA_DIR / "company_settings.json"
 CUSTOMERS_PATH = DATA_DIR / "customers.json"
 ITEMS_PATH = DATA_DIR / "items.json"
+REFERENCE_OPTIONS_PATH = DATA_DIR / "references.json"
 SEQUENCE_PATH = DATA_DIR / "sequence.json"
 DEFAULT_LETTERHEAD_BASENAMES = (
     "letterhead.jpeg",
@@ -68,9 +71,13 @@ def ensure_seed_data() -> None:
             "company_name": "GENTEC",
             "gstin": "33AXQPM7524G1Z8",
             "phone": "+91 8056789568",
+            "header_phone_line": "Mob : 80567 89568, 91235 87990",
+            "header_email": "E-mail : support@gentec.in",
+            "header_website": "WebSite : www.gentecpowertechnologies.com",
             "invoice_prefix": "DGSP",
             "job_card_prefix": "GEN/CBE",
             "max_rows_per_invoice": 8,
+            "max_line_items": 200,
             "delivery_terms_default": "work at site",
             "bank_details": [
                 "A/c Name: Gentec",
@@ -93,8 +100,20 @@ def ensure_seed_data() -> None:
                 company["logo_path"] = basename
                 _save_json(COMPANY_SETTINGS_PATH, company)
                 break
+    company_defaults = {
+        "header_phone_line": "Mob : 80567 89568, 91235 87990",
+        "header_email": "E-mail : support@gentec.in",
+        "header_website": "WebSite : www.gentecpowertechnologies.com",
+    }
+    updated = False
+    for key, value in company_defaults.items():
+        if not str(company.get(key, "")).strip():
+            company[key] = value
+            updated = True
+    if updated:
+        _save_json(COMPANY_SETTINGS_PATH, company)
 
-    _load_json(
+    customers = _load_json(
         CUSTOMERS_PATH,
         [
             {
@@ -106,6 +125,15 @@ def ensure_seed_data() -> None:
             }
         ],
     )
+    seeded_references = sorted(
+        {
+            str(customer.get("reference_default", "")).strip()
+            for customer in customers
+            if str(customer.get("reference_default", "")).strip()
+        },
+        key=str.lower,
+    )
+    _load_json(REFERENCE_OPTIONS_PATH, seeded_references)
 
     _load_json(
         ITEMS_PATH,
@@ -145,6 +173,52 @@ def parse_qty(value: str) -> float:
 
 def parse_bool(value: str | None) -> bool:
     return str(value).lower() in {"1", "true", "yes", "on"}
+
+
+def normalize_reference_option(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip()
+
+
+def is_valid_reference_option(value: str) -> bool:
+    normalized = normalize_reference_option(value)
+    return normalized.lower() not in {"", "none", "manual", "manual entry", "manul entry"}
+
+
+def get_reference_options(customers: List[Dict[str, Any]] | None = None) -> List[str]:
+    customers = customers if customers is not None else get_customers()
+    stored = _load_json(REFERENCE_OPTIONS_PATH, [])
+    unique: Dict[str, str] = {}
+    for raw in stored:
+        normalized = normalize_reference_option(raw)
+        if not is_valid_reference_option(normalized):
+            continue
+        unique.setdefault(normalized.lower(), normalized)
+    for customer in customers:
+        normalized = normalize_reference_option(customer.get("reference_default", ""))
+        if not is_valid_reference_option(normalized):
+            continue
+        unique.setdefault(normalized.lower(), normalized)
+    options = sorted(unique.values(), key=str.lower)
+    save_reference_options(options)
+    return options
+
+
+def save_reference_options(values: List[str]) -> None:
+    unique: Dict[str, str] = {}
+    for raw in values:
+        normalized = normalize_reference_option(raw)
+        if not is_valid_reference_option(normalized):
+            continue
+        unique.setdefault(normalized.lower(), normalized)
+    _save_json(REFERENCE_OPTIONS_PATH, sorted(unique.values(), key=str.lower))
+
+
+def register_reference_option(value: Any) -> None:
+    normalized = normalize_reference_option(value)
+    if not is_valid_reference_option(normalized):
+        return
+    existing = _load_json(REFERENCE_OPTIONS_PATH, [])
+    save_reference_options([*existing, normalized])
 
 
 def resolve_letterhead_path(company: Dict[str, Any]) -> Path | None:
@@ -198,10 +272,99 @@ def job_card_number(prefix: str, seq: int, fy: str) -> str:
     return f"{prefix}/{fy}/JC{seq:03d}"
 
 
+def sanitize_amount_in_words(value: str) -> str:
+    text = re.sub(r"^\s*(?:Rs\.?|₹)\s*", "", str(value or ""), flags=re.IGNORECASE)
+    return text.strip().rstrip(".")
+
+
 def amount_in_words(grand_total: float) -> str:
     rounded = int(round(grand_total))
     words = num2words(rounded, to="cardinal", lang="en_IN")
-    return f"Rs. {words.title()} Only"
+    return sanitize_amount_in_words(f"{words.title()} Only")
+
+
+def resolve_pdf_font_profile() -> Dict[str, str]:
+    cached = app.config.get("_pdf_font_profile")
+    if isinstance(cached, dict):
+        return cached
+
+    profile = {
+        "regular": "Times-Roman",
+        "bold": "Times-Bold",
+        "table_currency": "Rs",
+        "words_currency": "Rs.",
+    }
+    font_pairs = [
+        # Preferred: Bookman Old Style (project-local or OS fonts).
+        (
+            BASE_DIR / "fonts" / "Bookman Old Style.ttf",
+            BASE_DIR / "fonts" / "Bookman Old Style Bold.ttf",
+        ),
+        (
+            BASE_DIR / "fonts" / "BOOKOS.TTF",
+            BASE_DIR / "fonts" / "BOOKOSB.TTF",
+        ),
+        (
+            Path(r"C:\Windows\Fonts\BOOKOS.TTF"),
+            Path(r"C:\Windows\Fonts\BOOKOSB.TTF"),
+        ),
+        (
+            Path(r"C:\Windows\Fonts\bookos.ttf"),
+            Path(r"C:\Windows\Fonts\bookosb.ttf"),
+        ),
+        (
+            Path("/System/Library/Fonts/Supplemental/Bookman Old Style.ttf"),
+            Path("/System/Library/Fonts/Supplemental/Bookman Old Style Bold.ttf"),
+        ),
+        (
+            Path("/Library/Fonts/Bookman Old Style.ttf"),
+            Path("/Library/Fonts/Bookman Old Style Bold.ttf"),
+        ),
+        # Fallbacks when Bookman is not present.
+        (
+            BASE_DIR / "fonts" / "Times New Roman.ttf",
+            BASE_DIR / "fonts" / "Times New Roman Bold.ttf",
+        ),
+        (
+            Path("/System/Library/Fonts/Supplemental/Times New Roman.ttf"),
+            Path("/System/Library/Fonts/Supplemental/Times New Roman Bold.ttf"),
+        ),
+        (
+            Path("/Library/Fonts/Times New Roman.ttf"),
+            Path("/Library/Fonts/Times New Roman Bold.ttf"),
+        ),
+        (
+            Path(r"C:\Windows\Fonts\times.ttf"),
+            Path(r"C:\Windows\Fonts\timesbd.ttf"),
+        ),
+        (
+            Path("/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf"),
+            Path("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf"),
+        ),
+    ]
+    for regular_path, bold_path in font_pairs:
+        if not regular_path.exists() or not bold_path.exists():
+            continue
+        try:
+            regular_name = "GentecPdfRegular"
+            bold_name = "GentecPdfBold"
+            registered = pdfmetrics.getRegisteredFontNames()
+            if regular_name not in registered:
+                pdfmetrics.registerFont(TTFont(regular_name, str(regular_path)))
+            if bold_name not in registered:
+                pdfmetrics.registerFont(TTFont(bold_name, str(bold_path)))
+            profile = {
+                "regular": regular_name,
+                "bold": bold_name,
+                "table_currency": "Rs",
+                "words_currency": "Rs.",
+            }
+            break
+        except Exception:
+            continue
+
+    app.config["_pdf_font_profile"] = profile
+    return profile
 
 
 def calculate_totals(rows: List[Dict[str, Any]], transport: float) -> Dict[str, float]:
@@ -222,14 +385,19 @@ def build_invoice_from_form(form: Any, item_map: Dict[str, Dict[str, Any]], comp
     customer_name = form.get("customer_name", "").strip()
     customer_address = form.get("customer_address", "").strip()
     customer_gstin = form.get("customer_gstin", "").strip()
-    reference_choice = form.get("customer_reference_select", "NONE").strip()
-    reference_manual = form.get("customer_reference_manual", "").strip()
-    if reference_choice == "MANUAL":
-        customer_reference = reference_manual or "None"
-    elif reference_choice in {"", "NONE"}:
-        customer_reference = "None"
+    reference_direct = normalize_reference_option(form.get("customer_reference", ""))
+    if reference_direct and reference_direct.lower() != "none":
+        customer_reference = reference_direct
     else:
-        customer_reference = reference_choice
+        # Backward compatibility for older forms still posting select/manual fields.
+        reference_choice = form.get("customer_reference_select", "NONE").strip()
+        reference_manual = normalize_reference_option(form.get("customer_reference_manual", ""))
+        if reference_manual and reference_manual.lower() != "none":
+            customer_reference = reference_manual
+        elif reference_choice and reference_choice not in {"", "NONE", "MANUAL"}:
+            customer_reference = reference_choice
+        else:
+            customer_reference = "None"
 
     invoice_date = datetime.strptime(form.get("invoice_date"), "%Y-%m-%d").date()
     job_card_date = datetime.strptime(form.get("job_card_date"), "%Y-%m-%d").date()
@@ -270,9 +438,9 @@ def build_invoice_from_form(form: Any, item_map: Dict[str, Dict[str, Any]], comp
     if not rows:
         raise ValueError("At least one line item is required.")
 
-    max_rows = int(company.get("max_rows_per_invoice", 8))
-    if len(rows) > max_rows:
-        raise ValueError(f"Only {max_rows} rows are allowed for single-page invoice.")
+    max_line_items = int(company.get("max_line_items", 200))
+    if len(rows) > max_line_items:
+        raise ValueError(f"Only {max_line_items} line items are allowed per invoice.")
 
     preview_seq, preview_fy = sequence_preview(invoice_date)
 
@@ -344,15 +512,23 @@ def _draw_wrapped_block(
 def generate_pdf(invoice: Dict[str, Any], company: Dict[str, Any], output_path: Path) -> None:
     c = canvas.Canvas(str(output_path), pagesize=A4)
     width, height = A4
+    font_profile = resolve_pdf_font_profile()
+    pdf_font_regular = font_profile["regular"]
+    pdf_font_bold = font_profile["bold"]
+    table_currency = font_profile["table_currency"]
+    words_currency = font_profile["words_currency"]
+    words_value = sanitize_amount_in_words(invoice.get("amount_in_words", ""))
     margin = 22
-    content_width = width - (margin * 2)
     top_y = height - margin
     letterhead_path = resolve_letterhead_path(company)
     # Keep invoice table fully below the pre-printed logo/header area.
-    stationery_top_offset = 102
+    stationery_top_offset = 94
+    first_page_capacity = int(company.get("max_rows_per_invoice", 8))
+    continued_page_capacity = 22
 
-    if letterhead_path:
-        # Render the complete letterpad (including watermark/footer) as page background.
+    def draw_background() -> None:
+        if not letterhead_path:
+            return
         c.drawImage(
             str(letterhead_path),
             0,
@@ -362,52 +538,72 @@ def generate_pdf(invoice: Dict[str, Any], company: Dict[str, Any], output_path: 
             preserveAspectRatio=False,
             mask="auto",
         )
-        # Keep watermark/footer but hide top header when letterhead option is disabled.
         if not invoice.get("include_letterhead"):
             mask_height = stationery_top_offset + 22
             c.setFillColor(colors.white)
             c.rect(0, height - mask_height, width, mask_height, stroke=0, fill=1)
             c.setFillColor(colors.black)
 
+    draw_background()
+
+    page_rows = invoice["rows"][:first_page_capacity]
+    continued_rows = invoice["rows"][first_page_capacity:]
+    item_rows = len(page_rows)
+
+    h_title = 21
+    h_gst = 25
+    h_customer = 140
+    h_table_header = 27
+    h_item = 22
+    h_total = 19
+    base_outer_bottom = margin + 72
+    lift_per_missing_row = 8
+    missing_rows = max(0, first_page_capacity - item_rows)
+
     outer_left = margin + 20
     outer_right = width - margin - 20
     outer_top = top_y - (stationery_top_offset if letterhead_path else 54)
-    outer_bottom = margin + 52
+    layout_bottom = base_outer_bottom + (missing_rows * lift_per_missing_row)
     outer_width = outer_right - outer_left
-    split_x = outer_left + (outer_width * 0.50)
+    split_x = round(outer_left + (outer_width * 0.50))
 
-    c.setLineWidth(1.1)
-    c.rect(outer_left, outer_bottom, outer_width, outer_top - outer_bottom)
     c.setLineWidth(0.85)
 
     customer = invoice["customer"]
-
-    h_title = 26
-    h_gst = 28
-    h_customer = 156
-    h_table_header = 30
-    h_item = 24
-    h_total = 21
-    total_rows = 5
-    item_rows = len(invoice["rows"])
 
     y = outer_top
 
     # Title row
     y_title_bottom = y - h_title
+    c.setFillColor(colors.HexColor("#ececec"))
+    c.rect(outer_left, y_title_bottom, outer_width, h_title, stroke=0, fill=1)
+    c.setFillColor(colors.black)
     c.line(outer_left, y_title_bottom, outer_right, y_title_bottom)
-    c.setFont("Times-Bold", 12.5)
-    c.drawCentredString((outer_left + outer_right) / 2, y - 17, "TAX INVOICE")
+    c.setFont(pdf_font_bold, 12.5)
+    c.drawCentredString((outer_left + outer_right) / 2, y - 14, "TAX INVOICE")
     y = y_title_bottom
 
     # GST / recipient row
     y_gst_bottom = y - h_gst
     c.line(outer_left, y_gst_bottom, outer_right, y_gst_bottom)
     c.line(split_x, y, split_x, y_gst_bottom)
-    c.setFont("Times-Bold", 10.2)
-    c.drawString(outer_left + 4, y - 18, f"GSTIN: {company.get('gstin', '')}")
-    c.drawCentredString((split_x + outer_right) / 2, y - 18, "Original for Recipient")
+    c.setFont(pdf_font_bold, 10.2)
+    c.drawString(outer_left + 4, y - 16, f"GSTIN: {company.get('gstin', '')}")
+    c.drawCentredString((split_x + outer_right) / 2, y - 16, "Original for Recipient")
     y = y_gst_bottom
+
+    if letterhead_path and invoice.get("include_letterhead"):
+        contact_x = outer_left - 2
+        contact_top = outer_top + 64
+        contact_width = 270
+        contact_height = 56
+        c.setFillColor(colors.white)
+        c.rect(contact_x - 2, contact_top - contact_height, contact_width, contact_height, stroke=0, fill=1)
+        c.setFillColor(colors.black)
+        c.setFont(pdf_font_bold, 9.2)
+        c.drawString(contact_x, contact_top - 12, company.get("header_phone_line", ""))
+        c.drawString(contact_x, contact_top - 25, company.get("header_email", ""))
+        c.drawString(contact_x, contact_top - 38, company.get("header_website", ""))
 
     # Customer and right metadata block
     y_customer_bottom = y - h_customer
@@ -424,48 +620,43 @@ def generate_pdf(invoice: Dict[str, Any], company: Dict[str, Any], output_path: 
         ("Delivery Terms", invoice["delivery_terms"]),
     ]
     right_row_h = h_customer / len(meta_rows)
-    c.setFont("Times-Bold", 11)
-    c.drawString(outer_left + 4, y - 20, "Customer Details")
+    c.setFont(pdf_font_bold, 11)
+    c.drawString(outer_left + 4, y - 18, "Customer Details")
 
-    left_text_top = y - 42
-    left_max_width = split_x - outer_left - 10
-    left_min_y = y_customer_bottom + 8
-    left_y = _draw_wrapped_block(
-        c,
-        customer["name"],
-        outer_left + 5,
-        left_text_top,
-        left_max_width,
-        left_min_y,
-        "Times-Bold",
-        11,
-        14,
-    )
-    left_y = _draw_wrapped_block(
-        c,
-        customer["address"],
-        outer_left + 5,
-        left_y - 6,
-        left_max_width,
-        left_min_y,
-        "Times-Roman",
-        10.8,
-        13,
-    )
-    c.setFont("Times-Roman", 10.8)
-    c.drawString(outer_left + 5, max(left_min_y, left_y - 8), f"GSTIN: {customer['gstin']}")
-    c.drawString(outer_left + 5, max(left_min_y, left_y - 24), f"Ref: {customer['reference']}")
+    c.setFont(pdf_font_bold, 11)
+    c.drawString(outer_left + 5, y - 40, customer["name"])
+
+    address_tokens = [segment.strip() for segment in str(customer["address"]).split(",") if segment.strip()]
+    if len(address_tokens) >= 3:
+        address_lines = [address_tokens[0], address_tokens[1], ", ".join(address_tokens[2:])]
+    elif len(address_tokens) == 2:
+        address_lines = [address_tokens[0], address_tokens[1], ""]
+    else:
+        address_lines = _wrap_canvas_text(c, customer["address"], split_x - outer_left - 16, pdf_font_regular, 10.8)
+        while len(address_lines) < 3:
+            address_lines.append("")
+        address_lines = address_lines[:3]
+
+    c.setFont(pdf_font_regular, 10.8)
+    address_y = y - 58
+    for line in address_lines:
+        if line:
+            c.drawString(outer_left + 5, address_y, line)
+        address_y -= 13
+
+    c.drawString(outer_left + 5, y_customer_bottom + 28, f"GSTIN: {customer['gstin']}")
+    c.drawString(outer_left + 5, y_customer_bottom + 12, f"Ref: {customer['reference']}")
 
     current_top = y
-    label_x = split_x + 6
-    value_x = split_x + 94
+    value_split_x = split_x + 136
     for index, (label, value) in enumerate(meta_rows):
         current_bottom = y - ((index + 1) * right_row_h)
         c.line(split_x, current_bottom, outer_right, current_bottom)
-        c.setFont("Times-Bold", 10.6)
-        c.drawRightString(value_x - 6, current_top - 17, f"{label}:")
-        c.setFont("Times-Bold" if label == "Delivery Terms" else "Times-Roman", 10.6)
-        c.drawString(value_x, current_top - 17, str(value))
+        c.line(value_split_x, current_top, value_split_x, current_bottom)
+        c.setFont(pdf_font_bold, 10.6)
+        c.drawRightString(value_split_x - 6, current_top - 15, f"{label}:")
+        c.setFont(pdf_font_regular, 10.2)
+        c.drawString(value_split_x + 6, current_top - 15, str(value))
         current_top = current_bottom
 
     y = y_customer_bottom
@@ -474,32 +665,32 @@ def generate_pdf(invoice: Dict[str, Any], company: Dict[str, Any], output_path: 
     y_header_bottom = y - h_table_header
     c.line(outer_left, y_header_bottom, outer_right, y_header_bottom)
 
-    col_sl = outer_left + 36
-    col_desc = col_sl + 165
-    col_qty = col_desc + 42
-    col_hsn = col_qty + 64
-    col_unit = col_hsn + 98
+    col_sl = outer_left + 34
+    col_desc = col_sl + 188
+    col_qty = split_x
+    col_hsn = col_qty + 58
+    col_unit = value_split_x
     for xpos in [col_sl, col_desc, col_qty, col_hsn, col_unit]:
         c.line(xpos, y, xpos, y_header_bottom - (item_rows * h_item))
 
-    c.setFont("Times-Bold", 10.8)
-    c.drawCentredString((outer_left + col_sl) / 2, y - 19, "Sl.No")
-    c.drawCentredString((col_sl + col_desc) / 2, y - 19, "Description")
-    c.drawCentredString((col_desc + col_qty) / 2, y - 19, "Qty")
-    c.drawCentredString((col_qty + col_hsn) / 2, y - 19, "HSN/SAC")
-    c.drawCentredString((col_hsn + col_unit) / 2, y - 13, "Unit Price")
-    c.drawCentredString((col_hsn + col_unit) / 2, y - 25, "in Rs")
-    c.drawCentredString((col_unit + outer_right) / 2, y - 13, "Amount")
-    c.drawCentredString((col_unit + outer_right) / 2, y - 25, "in Rs")
+    c.setFont(pdf_font_bold, 10.8)
+    c.drawCentredString((outer_left + col_sl) / 2, y - 17, "Sl.No")
+    c.drawCentredString((col_sl + col_desc) / 2, y - 17, "Description")
+    c.drawCentredString((col_desc + col_qty) / 2, y - 17, "Qty")
+    c.drawCentredString((col_qty + col_hsn) / 2, y - 17, "HSN/SAC")
+    c.drawCentredString((col_hsn + col_unit) / 2, y - 15, "Unit Price")
+    c.drawCentredString((col_hsn + col_unit) / 2, y - 24, f"in {table_currency}")
+    c.drawCentredString((col_unit + outer_right) / 2, y - 15, "Amount")
+    c.drawCentredString((col_unit + outer_right) / 2, y - 24, f"in {table_currency}")
 
     item_y = y_header_bottom
-    c.setFont("Times-Roman", 11)
-    for index, row in enumerate(invoice["rows"], start=1):
+    c.setFont(pdf_font_regular, 11)
+    for index, row in enumerate(page_rows, start=1):
         next_y = item_y - h_item
         c.line(outer_left, next_y, outer_right, next_y)
-        c.drawRightString(col_sl - 5, item_y - 16, str(index))
+        c.drawCentredString((outer_left + col_sl) / 2, item_y - 15, str(index))
         c.drawCentredString((col_sl + col_desc) / 2, item_y - 16, row["description"])
-        c.drawRightString(col_qty - 5, item_y - 16, f"{row['qty']:g}")
+        c.drawCentredString((col_desc + col_qty) / 2, item_y - 15, f"{row['qty']:g}")
         c.drawCentredString((col_qty + col_hsn) / 2, item_y - 16, row["hsn_sac"])
         c.drawRightString(col_unit - 7, item_y - 16, f"{row['unit_price']:.2f}")
         c.drawRightString(outer_right - 5, item_y - 16, f"{row['amount']:.2f}")
@@ -508,8 +699,8 @@ def generate_pdf(invoice: Dict[str, Any], company: Dict[str, Any], output_path: 
     totals = invoice["totals"]
     totals_rows = [
         ("Total Amount", totals["subtotal"], True),
-        ("CGST 9%", totals["cgst"], False),
-        ("SGST 9%", totals["sgst"], False),
+        ("CGST 9%", totals["cgst"], True),
+        ("SGST 9%", totals["sgst"], True),
         ("Transport", totals["transport"], False),
         ("Grand Total", totals["grand_total"], True),
     ]
@@ -519,24 +710,28 @@ def generate_pdf(invoice: Dict[str, Any], company: Dict[str, Any], output_path: 
     for label, value, bold in totals_rows:
         next_y = total_y - h_total
         c.line(outer_left, next_y, outer_right, next_y)
-        c.setFont("Times-Bold" if bold else "Times-Roman", 11.2 if bold else 10.8)
+        c.setFont(pdf_font_bold if bold else pdf_font_regular, 11.2 if bold else 10.8)
         c.drawRightString(col_unit - 5, total_y - 14, label)
-        c.setFont("Times-Bold" if bold else "Times-Roman", 11.2 if bold else 10.8)
         c.drawRightString(outer_right - 5, total_y - 14, f"{value:.2f}")
         total_y = next_y
 
     # Footer details block
     footer_top = total_y
-    footer_min_y = outer_bottom + 8
+    footer_min_y = layout_bottom + 12
     left_block_right = split_x + 40
-    c.setFont("Times-Roman", 11)
-    c.drawString(outer_left + 4, footer_top - 16, f"Amount In words: {invoice['amount_in_words']}.")
-    c.drawString(outer_left + 4, footer_top - 34, "Mode of Payment:Cash/Cheque to ")
-    c.setFont("Times-Bold", 12)
-    c.drawString(outer_left + 180, footer_top - 34, "GENTEC.")
+    amount_words_y = footer_top - 16
+    amount_label = "Amount In words:"
+    c.setFont(pdf_font_regular, 11)
+    c.drawString(outer_left + 4, amount_words_y, amount_label)
+    amount_label_width = c.stringWidth(f"{amount_label} ", pdf_font_regular, 11)
+    c.setFont(pdf_font_bold, 11)
+    c.drawString(outer_left + 4 + amount_label_width, amount_words_y, f"{words_currency} {words_value}.")
+    c.setFont(pdf_font_bold, 11.8)
+    c.drawString(outer_left + 4, footer_top - 34, "Mode of Payment:Cash/Cheque to GENTEC.")
 
-    notes_y = footer_top - 52
-    c.setFont("Times-Bold", 11)
+    note_heading_y = footer_top - 52
+    notes_y = note_heading_y
+    c.setFont(pdf_font_bold, 11)
     c.drawString(outer_left + 4, notes_y, "Note:")
     notes_y -= 16
     note_prefixes = ["i", "ii", "iii", "iv", "v", "vi"]
@@ -548,37 +743,98 @@ def generate_pdf(invoice: Dict[str, Any], company: Dict[str, Any], output_path: 
             outer_left + 4,
             notes_y,
             left_block_right - outer_left - 8,
-            footer_min_y + 44,
-            "Times-Roman",
+            footer_min_y + 48,
+            pdf_font_regular,
             10.6,
-            13,
+            12,
         ) - 2
 
-    c.setFont("Times-Bold", 11)
-    c.drawString(outer_left + 4, max(footer_min_y + 28, notes_y), "Bank Details:-")
-    bank_y = max(footer_min_y + 12, notes_y - 16)
+    c.setFont(pdf_font_bold, 11)
+    bank_heading_y = max(footer_min_y + 28, notes_y)
+    c.drawString(outer_left + 4, bank_heading_y, "Bank Details:-")
+    bank_line_y = max(footer_min_y + 20, bank_heading_y - 14)
+    last_bank_line_y = bank_line_y
     for line in company.get("bank_details", []):
-        bank_y = _draw_wrapped_block(
-            c,
-            line,
-            outer_left + 4,
-            bank_y,
-            left_block_right - outer_left - 8,
-            footer_min_y,
-            "Times-Bold",
-            10.8,
-            13,
-        ) - 1
+        c.setFont(pdf_font_bold, 10.8)
+        c.drawString(outer_left + 4, bank_line_y, line)
+        last_bank_line_y = bank_line_y
+        bank_line_y -= 11
 
-    # Right-side signature block with fixed bottom alignment to avoid overlap.
-    c.setFont("Times-Bold", 14)
-    c.drawRightString(outer_right - 4, outer_bottom + 96, "For GENTEC")
-    c.setFont("Times-Bold", 12.2)
-    c.drawRightString(outer_right - 4, outer_bottom + 25, "Authorised Signatory")
-    c.setFont("Times-Roman", 12)
-    c.drawRightString(outer_right - 4, outer_bottom + 8, f"Mobile: {company.get('phone', '')}")
+    # Right-side signature block.
+    c.setFont(pdf_font_bold, 13)
+    c.drawRightString(outer_right - 4, note_heading_y, "For GENTEC")
+    mobile_y = max(last_bank_line_y, layout_bottom + 18)
+    c.setFont(pdf_font_bold, 12.2)
+    c.drawRightString(outer_right - 4, mobile_y + 20, "Authorised Signatory")
+    c.setFont(pdf_font_regular, 12)
+    c.drawRightString(outer_right - 4, mobile_y, f"Mobile: {company.get('phone', '')}")
+
+    border_bottom = max(layout_bottom, mobile_y - 10)
+    c.setLineWidth(1.1)
+    c.rect(outer_left, border_bottom, outer_width, outer_top - border_bottom)
+    c.setLineWidth(0.85)
 
     c.showPage()
+
+    # Continue only the item table on additional pages.
+    if continued_rows:
+        col_sl_w = 36
+        col_desc_w = 165
+        col_qty_w = 42
+        col_hsn_w = 64
+        col_unit_w = 98
+        current_index = first_page_capacity + 1
+        for chunk_start in range(0, len(continued_rows), continued_page_capacity):
+            chunk = continued_rows[chunk_start : chunk_start + continued_page_capacity]
+            draw_background()
+            page_outer_left = outer_left
+            page_outer_right = outer_right
+            page_top = top_y - (stationery_top_offset if letterhead_path else 54)
+            c.setFont(pdf_font_bold, 12)
+            c.drawString(page_outer_left, page_top, "Page continued...")
+
+            table_top = page_top - 14
+            table_header_h = 27
+            row_h = 22
+            table_height = table_header_h + (row_h * len(chunk))
+            table_bottom = table_top - table_height
+            c.rect(page_outer_left, table_bottom, page_outer_right - page_outer_left, table_height)
+
+            c.line(page_outer_left, table_top - table_header_h, page_outer_right, table_top - table_header_h)
+            c1 = page_outer_left + 34
+            c2 = c1 + 188
+            c3 = split_x
+            c4 = c3 + 58
+            c5 = value_split_x
+            for xpos in [c1, c2, c3, c4, c5]:
+                c.line(xpos, table_top, xpos, table_bottom)
+
+            c.setFont(pdf_font_bold, 10.8)
+            c.drawCentredString((page_outer_left + c1) / 2, table_top - 17, "Sl.No")
+            c.drawCentredString((c1 + c2) / 2, table_top - 17, "Description")
+            c.drawCentredString((c2 + c3) / 2, table_top - 17, "Qty")
+            c.drawCentredString((c3 + c4) / 2, table_top - 17, "HSN/SAC")
+            c.drawCentredString((c4 + c5) / 2, table_top - 15, "Unit Price")
+            c.drawCentredString((c4 + c5) / 2, table_top - 24, f"in {table_currency}")
+            c.drawCentredString((c5 + page_outer_right) / 2, table_top - 15, "Amount")
+            c.drawCentredString((c5 + page_outer_right) / 2, table_top - 24, f"in {table_currency}")
+
+            c.setFont(pdf_font_regular, 11)
+            row_y = table_top - table_header_h
+            for row in chunk:
+                next_row_y = row_y - row_h
+                c.line(page_outer_left, next_row_y, page_outer_right, next_row_y)
+                c.drawCentredString((page_outer_left + c1) / 2, row_y - 15, str(current_index))
+                c.drawCentredString((c1 + c2) / 2, row_y - 16, row["description"])
+                c.drawCentredString((c2 + c3) / 2, row_y - 15, f"{row['qty']:g}")
+                c.drawCentredString((c3 + c4) / 2, row_y - 16, row["hsn_sac"])
+                c.drawRightString(c5 - 7, row_y - 16, f"{row['unit_price']:.2f}")
+                c.drawRightString(page_outer_right - 5, row_y - 16, f"{row['amount']:.2f}")
+                row_y = next_row_y
+                current_index += 1
+
+            c.showPage()
+
     c.save()
 
 
@@ -649,7 +905,7 @@ def generate_excel(invoice: Dict[str, Any], company: Dict[str, Any], output_path
     ws["D11"] = f"Cust Order No: {invoice['order_no']}  Date: {invoice['order_date']}"
 
     table_start = 13
-    headers = ["Sl.No", "Description", "Qty", "HSN/SAC", "Unit Price", "Amount"]
+    headers = ["Sl.No", "Description", "Qty", "HSN/SAC", "Unit Price (Rs)", "Amount (Rs)"]
     for index, label in enumerate(headers, start=1):
         cell = ws.cell(table_start, index, label)
         cell.font = Font(bold=True)
@@ -685,14 +941,16 @@ def generate_excel(invoice: Dict[str, Any], company: Dict[str, Any], output_path
     for label, value in summary:
         ws.merge_cells(start_row=row_no, start_column=1, end_row=row_no, end_column=5)
         ws.cell(row_no, 1, label).alignment = Alignment(horizontal="right")
-        ws.cell(row_no, 1).font = Font(bold=label == "Grand Total")
-        ws.cell(row_no, 6, value).font = Font(bold=label == "Grand Total")
+        is_bold = label in {"CGST 9%", "SGST 9%", "Grand Total"}
+        ws.cell(row_no, 1).font = Font(bold=is_bold)
+        ws.cell(row_no, 6, value).font = Font(bold=is_bold)
         for col in range(1, 7):
             ws.cell(row_no, col).border = cell_border
         row_no += 1
 
     ws.merge_cells(start_row=row_no, start_column=1, end_row=row_no, end_column=6)
-    ws.cell(row_no, 1, f"Amount in words: {invoice['amount_in_words']}")
+    words_value = sanitize_amount_in_words(invoice.get("amount_in_words", ""))
+    ws.cell(row_no, 1, f"Amount in words: Rs. {words_value}")
 
     wb.save(output_path)
 
@@ -711,6 +969,7 @@ def get_company() -> Dict[str, Any]:
 
 def normalize_invoice_for_template(invoice: Dict[str, Any]) -> Dict[str, Any]:
     invoice["include_letterhead"] = bool(invoice.get("include_letterhead"))
+    invoice["amount_in_words"] = sanitize_amount_in_words(invoice.get("amount_in_words", ""))
     return invoice
 
 
@@ -732,10 +991,7 @@ def new_invoice() -> Any:
     customers = get_customers()
     items = get_items()
     company = get_company()
-    reference_options = sorted(
-        {str(customer.get("reference_default", "")).strip() for customer in customers if str(customer.get("reference_default", "")).strip()},
-        key=str.lower,
-    )
+    reference_options = get_reference_options(customers)
     today = date.today().isoformat()
     return render_template(
         "invoice_form.html",
@@ -743,6 +999,7 @@ def new_invoice() -> Any:
         items=items,
         reference_options=reference_options,
         company=company,
+        max_line_items=int(company.get("max_line_items", 200)),
         today=today,
         selected_customer=request.args.get("customer_id", ""),
     )
@@ -758,6 +1015,7 @@ def preview_invoice() -> Any:
         else:
             item_map = {str(item.get("description", "")).strip().lower(): item for item in get_items()}
             invoice = build_invoice_from_form(request.form, item_map, company)
+            register_reference_option(invoice.get("customer", {}).get("reference", ""))
 
         invoice = normalize_invoice_for_template(invoice)
         payload_json = json.dumps(invoice)
@@ -779,6 +1037,8 @@ def save_invoice() -> Any:
     payload_json = request.form.get("payload_json", "{}")
     invoice = json.loads(payload_json)
     invoice["include_letterhead"] = parse_bool(request.form.get("include_letterhead"))
+    invoice = normalize_invoice_for_template(invoice)
+    register_reference_option(invoice.get("customer", {}).get("reference", ""))
 
     invoice_date = datetime.strptime(invoice["invoice_date"], "%Y-%m-%d").date()
     seq, fy = sequence_next(invoice_date)
@@ -825,9 +1085,31 @@ def add_customer() -> Any:
         }
         customers.append(customer)
         _save_json(CUSTOMERS_PATH, customers)
+        register_reference_option(customer.get("reference_default", ""))
         flash("Customer added successfully.", "success")
         return redirect(url_for("new_invoice", customer_id=next_id))
     return render_template("customer_new.html")
+
+
+@app.route("/items/new", methods=["GET", "POST"])
+def add_item() -> Any:
+    if request.method == "POST":
+        items = get_items()
+        next_id = f"ITEM{len(items) + 1:03d}"
+        item = {
+            "item_id": next_id,
+            "description": request.form.get("description", "").strip(),
+            "hsn_sac": request.form.get("hsn_sac", "").strip(),
+            "default_unit_price": parse_money(request.form.get("default_unit_price", "0")),
+        }
+        if not item["description"]:
+            flash("Item description is required.", "error")
+            return render_template("item_new.html")
+        items.append(item)
+        _save_json(ITEMS_PATH, items)
+        flash("Item added successfully.", "success")
+        return redirect(url_for("new_invoice"))
+    return render_template("item_new.html")
 
 
 @app.route("/history")
@@ -855,6 +1137,30 @@ def download_xlsx(invoice_id: str) -> Any:
         flash("Invoice not found.", "error")
         return redirect(url_for("history"))
     return send_file(BASE_DIR / payload["xlsx_file"], as_attachment=True)
+
+
+@app.route("/invoice/<invoice_id>/delete", methods=["POST"])
+def delete_invoice(invoice_id: str) -> Any:
+    invoice_path = INVOICE_DIR / f"{invoice_id}.json"
+    payload = _load_json(invoice_path, None)
+    if not payload:
+        flash("Invoice not found.", "error")
+        return redirect(url_for("history"))
+
+    base_resolved = BASE_DIR.resolve()
+    for key in ("pdf_file", "xlsx_file"):
+        rel_path = payload.get(key)
+        if not rel_path:
+            continue
+        file_path = (BASE_DIR / rel_path).resolve()
+        if base_resolved in file_path.parents and file_path.exists():
+            file_path.unlink()
+
+    if invoice_path.exists():
+        invoice_path.unlink()
+
+    flash(f"Invoice {payload.get('invoice_no', invoice_id)} deleted.", "success")
+    return redirect(url_for("history"))
 
 
 if __name__ == "__main__":

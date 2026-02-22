@@ -1,0 +1,62 @@
+{
+  "include_letterhead": true,
+  "invoice_date": "2026-02-21",
+  "job_card_date": "2026-02-21",
+  "order_no": "Verbally",
+  "order_date": "2026-02-21",
+  "delivery_terms": "work at site",
+  "customer": {
+    "name": "Saaral Family Restaurant",
+    "address": "34-F1, Karupparayan Kovil Street, Samalapuram, Palladam, Tiruppur - 641663",
+    "gstin": "33FXEPS2789N1ZL",
+    "reference": "Mahindra 15Kva"
+  },
+  "rows": [
+    {
+      "item_id": "ITEM001",
+      "description": "Fuel filter",
+      "hsn_sac": "8421",
+      "qty": 2.0,
+      "unit_price": 220.0,
+      "amount": 440.0
+    },
+    {
+      "item_id": "ITEM004",
+      "description": "Banjo Washer",
+      "hsn_sac": "7415",
+      "qty": 5.0,
+      "unit_price": 22.0,
+      "amount": 110.0
+    },
+    {
+      "item_id": "ITEM005",
+      "description": "Stop Solenoid Coil",
+      "hsn_sac": "8481",
+      "qty": 1.0,
+      "unit_price": 4842.0,
+      "amount": 4842.0
+    }
+  ],
+  "totals": {
+    "subtotal": 5392.0,
+    "cgst": 485.28,
+    "sgst": 485.28,
+    "transport": 0.0,
+    "grand_total": 6362.56
+  },
+  "amount_in_words": "Rs. Six Thousand, Three Hundred And Sixty-Three Only",
+  "preview": {
+    "sequence": 13,
+    "financial_year": "25-26",
+    "invoice_no": "DGSP-13/25-26",
+    "job_card_no": "GEN/CBE/25-26/JC013"
+  },
+  "invoice_id": "20260221235024-013",
+  "financial_year": "25-26",
+  "sequence": 13,
+  "invoice_no": "DGSP-13/25-26",
+  "job_card_no": "GEN/CBE/25-26/JC013",
+  "created_at": "2026-02-21T23:50:24",
+  "pdf_file": "data/generated/pdf/DGSP-13-25-26.pdf",
+  "xlsx_file": "data/generated/xlsx/DGSP-13-25-26.xlsx"
+}

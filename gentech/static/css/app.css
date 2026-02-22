@@ -53,6 +53,7 @@ nav a,
   max-width: 1180px;
   margin: 20px auto;
   padding: 0 16px 24px;
+  overflow-x: auto;
 }
 
 .card {
@@ -217,6 +218,17 @@ textarea {
   font-weight: 600;
 }
 
+.btn-danger-small {
+  width: auto;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #fca5a5;
+  background: #fee2e2;
+  color: #991b1b;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .muted {
   color: #6b7280;
   font-size: 0.9rem;
@@ -243,10 +255,16 @@ textarea {
   border: 1px solid #8b9198;
   background: #fff;
   padding: 0;
-  margin-top: 12px;
+  margin: 12px auto;
+  width: 210mm;
+  min-width: 210mm;
+  max-width: 210mm;
+  height: 297mm;
   background-position: center;
   background-repeat: no-repeat;
   background-size: 100% 100%;
+  overflow: hidden;
+  position: relative;
 }
 
 .invoice-sheet.with-stationery {
@@ -254,7 +272,7 @@ textarea {
 }
 
 .header-spacer {
-  min-height: 116px;
+  min-height: 108px;
 }
 
 .header-spacer.mask-header {
@@ -277,21 +295,12 @@ textarea {
 .classic-table td,
 .classic-table th {
   border: 1px solid #111;
-  padding: 4px 6px;
+  padding: 3px 5px;
   vertical-align: top;
 }
 
 .classic-table.nested td {
-  border-left: 0;
-  border-right: 0;
-}
-
-.classic-table.nested tr:first-child td {
-  border-top: 0;
-}
-
-.classic-table.nested tr:last-child td {
-  border-bottom: 0;
+  border: 1px solid #111;
 }
 
 .line-table th {
@@ -301,7 +310,10 @@ textarea {
 }
 
 .line-table td:nth-child(1),
-.line-table td:nth-child(3),
+.line-table td:nth-child(3) {
+  text-align: center;
+}
+
 .line-table td:nth-child(4),
 .line-table td:nth-child(5),
 .line-table td:nth-child(6) {
@@ -330,7 +342,11 @@ textarea {
 }
 
 .large {
-  font-size: 1.65rem;
+  font-size: 1.52rem;
+}
+
+.title-cell {
+  background: #ececec;
 }
 
 .no-padding {
@@ -338,7 +354,7 @@ textarea {
 }
 
 .left-box {
-  min-height: 168px;
+  min-height: 150px;
   padding: 6px;
 }
 
@@ -355,16 +371,22 @@ textarea {
 .footer-grid {
   display: grid;
   grid-template-columns: 70% 30%;
-  min-height: 190px;
+  min-height: 0;
 }
 
 .footer-left {
   padding: 6px;
   border-top: 1px solid #111;
+  display: flex;
+  flex-direction: column;
 }
 
 .footer-left p {
   margin: 3px 0;
+}
+
+.footer-left .branch-line {
+  margin-top: auto;
 }
 
 .footer-right {
@@ -372,7 +394,8 @@ textarea {
   padding: 6px;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  align-items: flex-end;
+  justify-content: flex-start;
   text-align: right;
 }
 
@@ -381,12 +404,38 @@ textarea {
 }
 
 .footer-right .for-gentec {
-  margin-bottom: 54px;
-  font-size: 1.15rem;
+  margin-top: 2px;
+  margin-bottom: 36px;
+  font-size: 1.07rem;
 }
 
 .footer-right .auth {
   font-size: 1.08rem;
+  margin-top: 0;
+}
+
+.footer-right .mobile {
+  margin: 0;
+}
+
+.stationery-contact {
+  position: absolute;
+  left: 14mm;
+  top: 16mm;
+  width: 70mm;
+  background: rgba(255, 255, 255, 0.92);
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  font-size: 3.4mm;
+  font-weight: 700;
+  line-height: 1.24;
+  color: #111;
+  padding: 1mm 1.5mm;
+}
+
+.inline-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
 }
 
 .letterhead-band {
@@ -448,4 +497,5 @@ textarea {
     flex-direction: column;
     gap: 10px;
   }
+
 }

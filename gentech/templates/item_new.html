@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card small">
+  <h2>Add New Item</h2>
+  <form method="post">
+    <label>Description</label>
+    <input name="description" required />
+
+    <label>HSN/SAC</label>
+    <input name="hsn_sac" required />
+
+    <label>Default Unit Price</label>
+    <input name="default_unit_price" required />
+
+    <button type="submit" class="btn-primary">Save Item</button>
+  </form>
+</section>
+{% endblock %}

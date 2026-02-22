@@ -1,0 +1,46 @@
+{
+  "include_letterhead": true,
+  "invoice_date": "2026-02-22",
+  "job_card_date": "2026-02-22",
+  "order_no": "Verbally",
+  "order_date": "2026-02-22",
+  "delivery_terms": "work at site",
+  "customer": {
+    "name": "Saaral Family Restaurant",
+    "address": "34-F1, Karupparayan Kovil Street, Samalapuram, Palladam, Tiruppur - 641663",
+    "gstin": "33FXEPS2789N1ZL",
+    "reference": "Mahindra 15Kva"
+  },
+  "rows": [
+    {
+      "item_id": "ITEM003",
+      "description": "Filter O ring",
+      "hsn_sac": "8421",
+      "qty": 2.0,
+      "unit_price": 125.0,
+      "amount": 250.0
+    }
+  ],
+  "totals": {
+    "subtotal": 250.0,
+    "cgst": 22.5,
+    "sgst": 22.5,
+    "transport": 0.0,
+    "grand_total": 295.0
+  },
+  "amount_in_words": "Two Hundred And Ninety-Five Only",
+  "preview": {
+    "sequence": 18,
+    "financial_year": "25-26",
+    "invoice_no": "DGSP-18/25-26",
+    "job_card_no": "GEN/CBE/25-26/JC018"
+  },
+  "invoice_id": "20260222090300-018",
+  "financial_year": "25-26",
+  "sequence": 18,
+  "invoice_no": "DGSP-18/25-26",
+  "job_card_no": "GEN/CBE/25-26/JC018",
+  "created_at": "2026-02-22T09:03:00",
+  "pdf_file": "data/generated/pdf/DGSP-18-25-26.pdf",
+  "xlsx_file": "data/generated/xlsx/DGSP-18-25-26.xlsx"
+}

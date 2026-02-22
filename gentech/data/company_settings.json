@@ -16,5 +16,8 @@
     "Goods once sold will not be taken back.",
     "Interest @18% will be charged on unpaid amount after 45 days of invoice date."
   ],
-  "logo_path": "letterhead.jpeg"
+  "logo_path": "letterhead.jpeg",
+  "header_phone_line": "Mob : 80567 89568, 91235 87990",
+  "header_email": "E-mail : support@gentec.in",
+  "header_website": "WebSite : www.gentecpowertechnologies.com"
 }

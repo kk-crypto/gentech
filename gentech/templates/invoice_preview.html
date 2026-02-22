@@ -26,6 +26,13 @@
     class="invoice-sheet {% if has_letterhead %}with-stationery{% endif %}"
     {% if has_letterhead %}style="--stationery-url: url('{{ url_for('letterhead_asset') }}');"{% endif %}
   >
+    {% if has_letterhead and invoice.include_letterhead %}
+    <div class="stationery-contact">
+      <div>{{ company.get("header_phone_line", "Mob : 80567 89568, 91235 87990") }}</div>
+      <div>{{ company.get("header_email", "E-mail : support@gentec.in") }}</div>
+      <div>{{ company.get("header_website", "WebSite : www.gentecpowertechnologies.com") }}</div>
+    </div>
+    {% endif %}
     {% if has_letterhead %}
     <div class="header-spacer {% if not invoice.include_letterhead %}mask-header{% endif %}"></div>
     {% else %}
@@ -39,7 +46,7 @@
     <div class="invoice-frame">
       <table class="classic-table full-width">
         <tr>
-          <td colspan="2" class="center strong large">TAX INVOICE</td>
+          <td colspan="2" class="center strong large title-cell">TAX INVOICE</td>
         </tr>
         <tr>
           <td class="strong">GSTIN: {{ company.gstin }}</td>
@@ -50,7 +57,7 @@
             <div class="left-box">
               <p class="strong">Customer Details</p>
               <p class="strong">{{ invoice.customer.name }}</p>
-              <p>{{ invoice.customer.address }}</p>
+              <p>{{ invoice.customer.address|replace(', ', ',<br/>', 2)|safe }}</p>
               <p>GSTIN: {{ invoice.customer.gstin }}</p>
               <p>Ref: {{ invoice.customer.reference }}</p>
             </div>
@@ -63,13 +70,21 @@
               <tr><td class="label">Job Card Date:</td><td>{{ invoice.job_card_date }}</td></tr>
               <tr><td class="label">Cust's Order No:</td><td>{{ invoice.order_no }}</td></tr>
               <tr><td class="label">Date:</td><td>{{ invoice.order_date }}</td></tr>
-              <tr><td class="label">Delivery Terms:</td><td class="strong">{{ invoice.delivery_terms }}</td></tr>
+              <tr><td class="label">Delivery Terms:</td><td>{{ invoice.delivery_terms }}</td></tr>
             </table>
           </td>
         </tr>
       </table>
 
       <table class="classic-table line-table full-width">
+        <colgroup>
+          <col style="width: 7%;" />
+          <col style="width: 39%;" />
+          <col style="width: 8%;" />
+          <col style="width: 11%;" />
+          <col style="width: 16%;" />
+          <col style="width: 19%;" />
+        </colgroup>
         <thead>
           <tr>
             <th>Sl.No</th>
@@ -81,7 +96,7 @@
           </tr>
         </thead>
         <tbody>
-          {% for row in invoice.rows %}
+          {% for row in invoice.rows[:company.max_rows_per_invoice] %}
           <tr>
             <td>{{ loop.index }}</td>
             <td>{{ row.description }}</td>
@@ -92,17 +107,20 @@
           </tr>
           {% endfor %}
           <tr class="total-row"><td colspan="5">Total Amount</td><td>{{ "%.2f"|format(invoice.totals.subtotal) }}</td></tr>
-          <tr><td colspan="5">CGST 9%</td><td>{{ "%.2f"|format(invoice.totals.cgst) }}</td></tr>
-          <tr><td colspan="5">SGST 9%</td><td>{{ "%.2f"|format(invoice.totals.sgst) }}</td></tr>
+          <tr class="total-row"><td colspan="5">CGST 9%</td><td>{{ "%.2f"|format(invoice.totals.cgst) }}</td></tr>
+          <tr class="total-row"><td colspan="5">SGST 9%</td><td>{{ "%.2f"|format(invoice.totals.sgst) }}</td></tr>
           <tr><td colspan="5">Transport</td><td>{{ "%.2f"|format(invoice.totals.transport) }}</td></tr>
           <tr class="grand-row"><td colspan="5">Grand Total</td><td>{{ "%.2f"|format(invoice.totals.grand_total) }}</td></tr>
         </tbody>
       </table>
+      {% if invoice.rows|length > company.max_rows_per_invoice %}
+      <p class="muted">Page continued... (additional line items will appear on next PDF page)</p>
+      {% endif %}
 
       <div class="footer-grid">
         <div class="footer-left">
-          <p>Amount In words: {{ invoice.amount_in_words }}.</p>
-          <p>Mode of Payment:Cash/Cheque to <span class="strong">GENTEC.</span></p>
+          <p>Amount In words: <span class="strong">Rs. {{ invoice.amount_in_words }}</span>.</p>
+          <p class="strong">Mode of Payment:Cash/Cheque to GENTEC.</p>
           <p class="strong">Note:</p>
           {% for note in company.notes %}
           <p>
@@ -112,7 +130,7 @@
           {% endfor %}
           <p class="strong">Bank Details:-</p>
           {% for line in company.bank_details %}
-          <p class="strong">{{ line }}</p>
+          <p class="strong bank-line {% if loop.last %}branch-line{% endif %}">{{ line }}</p>
           {% endfor %}
         </div>
         <div class="footer-right">

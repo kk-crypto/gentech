@@ -1,0 +1,54 @@
+{
+  "include_letterhead": true,
+  "invoice_date": "2026-02-22",
+  "job_card_date": "2026-02-22",
+  "order_no": "Verbally",
+  "order_date": "2026-02-22",
+  "delivery_terms": "work at site",
+  "customer": {
+    "name": "Saaral Family Restaurant",
+    "address": "34-F1, Karupparayan Kovil Street, Samalapuram, Palladam, Tiruppur - 641663",
+    "gstin": "33FXEPS2789N1ZL",
+    "reference": "Mahindra 15Kva 2876 hrs"
+  },
+  "rows": [
+    {
+      "item_id": "ITEM002",
+      "description": "Lube Oil filter",
+      "hsn_sac": "8421",
+      "qty": 2.0,
+      "unit_price": 585.0,
+      "amount": 1170.0
+    },
+    {
+      "item_id": "ITEM004",
+      "description": "Banjo Washer",
+      "hsn_sac": "7415",
+      "qty": 2.0,
+      "unit_price": 22.0,
+      "amount": 44.0
+    }
+  ],
+  "totals": {
+    "subtotal": 1214.0,
+    "cgst": 109.26,
+    "sgst": 109.26,
+    "transport": 0.0,
+    "grand_total": 1432.52
+  },
+  "amount_in_words": "One Thousand, Four Hundred And Thirty-Three Only",
+  "preview": {
+    "sequence": 20,
+    "financial_year": "25-26",
+    "invoice_no": "DGSP-20/25-26",
+    "job_card_no": "GEN/CBE/25-26/JC020"
+  },
+  "invoice_id": "20260222100655-020",
+  "financial_year": "25-26",
+  "sequence": 20,
+  "invoice_no": "DGSP-20/25-26",
+  "job_card_no": "GEN/CBE/25-26/JC020",
+  "created_at": "2026-02-22T10:06:55",
+  "pdf_file": "data/generated/pdf/DGSP-20-25-26.pdf",
+  "xlsx_file": "data/generated/xlsx/DGSP-20-25-26.xlsx"
+}

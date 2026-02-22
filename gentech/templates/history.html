@@ -11,6 +11,7 @@
         <th>Grand Total</th>
         <th>Letterhead</th>
         <th>Downloads</th>
+        <th>Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -26,10 +27,15 @@
           |
           <a href="{{ url_for('download_xlsx', invoice_id=invoice.invoice_id) }}">Excel</a>
         </td>
+        <td>
+          <form method="post" action="{{ url_for('delete_invoice', invoice_id=invoice.invoice_id) }}" onsubmit="return confirm('Delete this invoice from history?');">
+            <button type="submit" class="btn-danger-small">Delete</button>
+          </form>
+        </td>
       </tr>
       {% else %}
       <tr>
-        <td colspan="6" class="center">No invoices saved yet.</td>
+        <td colspan="7" class="center">No invoices saved yet.</td>
       </tr>
       {% endfor %}
     </tbody>

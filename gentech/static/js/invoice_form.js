@@ -3,8 +3,7 @@
   const customerName = document.getElementById("customer_name");
   const customerAddress = document.getElementById("customer_address");
   const customerGstin = document.getElementById("customer_gstin");
-  const referenceSelect = document.getElementById("customer_reference_select");
-  const referenceManual = document.getElementById("customer_reference_manual");
+  const referenceInput = document.getElementById("customer_reference");
   const transportInput = document.getElementById("transport");
 
   const table = document.getElementById("line-items");
@@ -37,14 +36,6 @@
   function asNumber(value) {
     const parsed = Number.parseFloat(String(value || "").replace(/,/g, ""));
     return Number.isFinite(parsed) ? parsed : 0;
-  }
-
-  function syncReferenceManualVisibility() {
-    const isManual = referenceSelect.value === "MANUAL";
-    referenceManual.style.display = isManual ? "block" : "none";
-    if (!isManual) {
-      referenceManual.value = "";
-    }
   }
 
   function applyDescriptionDefaults(row, force) {
@@ -134,7 +125,7 @@
   function addItemRow() {
     const rowCount = tbody.querySelectorAll("tr").length;
     if (rowCount >= maxRows) {
-      window.alert("Maximum line item rows reached for single-page invoice.");
+      window.alert("Maximum line item rows reached for this invoice.");
       return;
     }
 
@@ -165,29 +156,13 @@
     customerGstin.value = selected.dataset.gstin || "";
 
     const selectedReference = String(selected.dataset.reference || "").trim();
-    if (!selectedReference) {
-      referenceSelect.value = "NONE";
-      referenceManual.value = "";
-      syncReferenceManualVisibility();
-      return;
-    }
-
-    const optionExists = [...referenceSelect.options].some((option) => option.value === selectedReference);
-    if (optionExists) {
-      referenceSelect.value = selectedReference;
-      referenceManual.value = "";
-    } else {
-      referenceSelect.value = "MANUAL";
-      referenceManual.value = selectedReference;
-    }
-    syncReferenceManualVisibility();
+    referenceInput.value = selectedReference || "";
   }
 
   buildDescriptionDataList();
 
   addRowButton.addEventListener("click", addItemRow);
   customerSelect.addEventListener("change", fillCustomerFromSelection);
-  referenceSelect.addEventListener("change", syncReferenceManualVisibility);
   transportInput.addEventListener("input", recalculate);
   transportInput.addEventListener("change", recalculate);
 
@@ -196,6 +171,5 @@
   if (customerSelect.value) {
     fillCustomerFromSelection();
   }
-  syncReferenceManualVisibility();
   recalculate();
 })();
