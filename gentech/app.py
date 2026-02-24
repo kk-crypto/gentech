@@ -523,8 +523,6 @@ def generate_pdf(invoice: Dict[str, Any], company: Dict[str, Any], output_path: 
     letterhead_path = resolve_letterhead_path(company)
     # Keep invoice table fully below the pre-printed logo/header area.
     stationery_top_offset = 94
-    first_page_capacity = int(company.get("max_rows_per_invoice", 8))
-    continued_page_capacity = 22
 
     def draw_background() -> None:
         if not letterhead_path:
@@ -546,24 +544,20 @@ def generate_pdf(invoice: Dict[str, Any], company: Dict[str, Any], output_path: 
 
     draw_background()
 
-    page_rows = invoice["rows"][:first_page_capacity]
-    continued_rows = invoice["rows"][first_page_capacity:]
-    item_rows = len(page_rows)
-
     h_title = 21
     h_gst = 25
     h_customer = 140
-    h_table_header = 27
-    h_item = 22
-    h_total = 19
-    base_outer_bottom = margin + 72
-    lift_per_missing_row = 8
-    missing_rows = max(0, first_page_capacity - item_rows)
+    # Reduce table row heights by ~10% to match requested compact layout.
+    h_table_header = 24
+    h_item = 20
+    h_total = 17
+    # Reserve a larger bottom safe zone when stationery footer/address is present.
+    base_outer_bottom = margin + (108 if letterhead_path else 72)
 
     outer_left = margin + 20
     outer_right = width - margin - 20
     outer_top = top_y - (stationery_top_offset if letterhead_path else 54)
-    layout_bottom = base_outer_bottom + (missing_rows * lift_per_missing_row)
+    layout_bottom = base_outer_bottom
     outer_width = outer_right - outer_left
     split_x = round(outer_left + (outer_width * 0.50))
 
@@ -648,14 +642,31 @@ def generate_pdf(invoice: Dict[str, Any], company: Dict[str, Any], output_path: 
     c.drawString(outer_left + 5, y_customer_bottom + 12, f"Ref: {customer['reference']}")
 
     current_top = y
-    value_split_x = split_x + 136
+    right_block_width = outer_right - split_x
+    meta_label_font_size = 10.6
+    meta_value_font_size = 10.2
+    max_label_width = max(
+        c.stringWidth(f"{label}:", pdf_font_bold, meta_label_font_size) for label, _ in meta_rows
+    )
+    max_value_width = max(
+        c.stringWidth(str(value), pdf_font_regular, meta_value_font_size) for _, value in meta_rows
+    )
+    min_label_col_width = max_label_width + 12
+    # Grow value column when content is long so text never touches right border.
+    desired_value_col_width = max(104, max_value_width + 12)
+    max_value_col_width = max(96, right_block_width - min_label_col_width)
+    value_col_width = min(desired_value_col_width, max_value_col_width)
+    value_split_x = round(outer_right - value_col_width)
+    min_value_split_for_table = split_x + 58 + 64
+    if value_split_x < min_value_split_for_table:
+        value_split_x = min_value_split_for_table
     for index, (label, value) in enumerate(meta_rows):
         current_bottom = y - ((index + 1) * right_row_h)
         c.line(split_x, current_bottom, outer_right, current_bottom)
         c.line(value_split_x, current_top, value_split_x, current_bottom)
-        c.setFont(pdf_font_bold, 10.6)
+        c.setFont(pdf_font_bold, meta_label_font_size)
         c.drawRightString(value_split_x - 6, current_top - 15, f"{label}:")
-        c.setFont(pdf_font_regular, 10.2)
+        c.setFont(pdf_font_regular, meta_value_font_size)
         c.drawString(value_split_x + 6, current_top - 15, str(value))
         current_top = current_bottom
 
@@ -670,122 +681,202 @@ def generate_pdf(invoice: Dict[str, Any], company: Dict[str, Any], output_path: 
     col_qty = split_x
     col_hsn = col_qty + 58
     col_unit = value_split_x
+    remaining_rows = list(invoice["rows"])
+    item_area_top_first = y_header_bottom
+    item_area_top_continued = (top_y - (stationery_top_offset if letterhead_path else 54) - 14) - h_table_header
+    totals_block_height = h_total * 5
+    first_page_capacity_without_totals = max(1, int((item_area_top_first - layout_bottom) // h_item))
+    first_page_capacity_with_totals = max(1, int((item_area_top_first - (layout_bottom + totals_block_height)) // h_item))
+    continued_page_capacity_without_totals = max(1, int((item_area_top_continued - base_outer_bottom) // h_item))
+    continued_page_capacity_with_totals = max(1, int((item_area_top_continued - (base_outer_bottom + totals_block_height)) // h_item))
+
+    first_page_has_all_rows = len(remaining_rows) <= first_page_capacity_with_totals
+    first_page_row_count = (
+        len(remaining_rows)
+        if first_page_has_all_rows
+        else min(first_page_capacity_without_totals, len(remaining_rows))
+    )
+    page_rows = remaining_rows[:first_page_row_count]
+    remaining_rows = remaining_rows[first_page_row_count:]
+
     for xpos in [col_sl, col_desc, col_qty, col_hsn, col_unit]:
-        c.line(xpos, y, xpos, y_header_bottom - (item_rows * h_item))
+        c.line(xpos, y, xpos, y_header_bottom - (len(page_rows) * h_item))
 
     c.setFont(pdf_font_bold, 10.8)
-    c.drawCentredString((outer_left + col_sl) / 2, y - 17, "Sl.No")
-    c.drawCentredString((col_sl + col_desc) / 2, y - 17, "Description")
-    c.drawCentredString((col_desc + col_qty) / 2, y - 17, "Qty")
-    c.drawCentredString((col_qty + col_hsn) / 2, y - 17, "HSN/SAC")
-    c.drawCentredString((col_hsn + col_unit) / 2, y - 15, "Unit Price")
-    c.drawCentredString((col_hsn + col_unit) / 2, y - 24, f"in {table_currency}")
-    c.drawCentredString((col_unit + outer_right) / 2, y - 15, "Amount")
-    c.drawCentredString((col_unit + outer_right) / 2, y - 24, f"in {table_currency}")
+    c.drawCentredString((outer_left + col_sl) / 2, y - 15, "Sl.No")
+    c.drawCentredString((col_sl + col_desc) / 2, y - 15, "Description")
+    c.drawCentredString((col_desc + col_qty) / 2, y - 15, "Qty")
+    c.drawCentredString((col_qty + col_hsn) / 2, y - 15, "HSN/SAC")
+    c.drawCentredString((col_hsn + col_unit) / 2, y - 13, "Unit Price")
+    c.drawCentredString((col_hsn + col_unit) / 2, y - 21, f"in {table_currency}")
+    c.drawCentredString((col_unit + outer_right) / 2, y - 13, "Amount")
+    c.drawCentredString((col_unit + outer_right) / 2, y - 21, f"in {table_currency}")
 
     item_y = y_header_bottom
     c.setFont(pdf_font_regular, 11)
     for index, row in enumerate(page_rows, start=1):
         next_y = item_y - h_item
         c.line(outer_left, next_y, outer_right, next_y)
-        c.drawCentredString((outer_left + col_sl) / 2, item_y - 15, str(index))
-        c.drawCentredString((col_sl + col_desc) / 2, item_y - 16, row["description"])
-        c.drawCentredString((col_desc + col_qty) / 2, item_y - 15, f"{row['qty']:g}")
-        c.drawCentredString((col_qty + col_hsn) / 2, item_y - 16, row["hsn_sac"])
-        c.drawRightString(col_unit - 7, item_y - 16, f"{row['unit_price']:.2f}")
-        c.drawRightString(outer_right - 5, item_y - 16, f"{row['amount']:.2f}")
+        c.drawCentredString((outer_left + col_sl) / 2, item_y - 13, str(index))
+        c.drawCentredString((col_sl + col_desc) / 2, item_y - 14, row["description"])
+        c.drawCentredString((col_desc + col_qty) / 2, item_y - 13, f"{row['qty']:g}")
+        c.drawCentredString((col_qty + col_hsn) / 2, item_y - 14, row["hsn_sac"])
+        c.drawRightString(col_unit - 7, item_y - 14, f"{row['unit_price']:.2f}")
+        c.drawRightString(outer_right - 5, item_y - 14, f"{row['amount']:.2f}")
         item_y = next_y
 
-    totals = invoice["totals"]
-    totals_rows = [
-        ("Total Amount", totals["subtotal"], True),
-        ("CGST 9%", totals["cgst"], True),
-        ("SGST 9%", totals["sgst"], True),
-        ("Transport", totals["transport"], False),
-        ("Grand Total", totals["grand_total"], True),
-    ]
-    totals_top = item_y
-    c.line(col_unit, totals_top, col_unit, totals_top - (h_total * len(totals_rows)))
-    total_y = totals_top
-    for label, value, bold in totals_rows:
-        next_y = total_y - h_total
-        c.line(outer_left, next_y, outer_right, next_y)
-        c.setFont(pdf_font_bold if bold else pdf_font_regular, 11.2 if bold else 10.8)
-        c.drawRightString(col_unit - 5, total_y - 14, label)
-        c.drawRightString(outer_right - 5, total_y - 14, f"{value:.2f}")
-        total_y = next_y
+    def draw_totals_block(
+        totals_top: float,
+        column_unit_x: float,
+        page_outer_left: float,
+        page_outer_right: float,
+    ) -> float:
+        totals = invoice["totals"]
+        totals_rows = [
+            ("Total Amount", totals["subtotal"], True),
+            ("CGST 9%", totals["cgst"], True),
+            ("SGST 9%", totals["sgst"], True),
+            ("Transport", totals["transport"], False),
+            ("Grand Total", totals["grand_total"], True),
+        ]
+        c.line(column_unit_x, totals_top, column_unit_x, totals_top - (h_total * len(totals_rows)))
+        total_y = totals_top
+        for label, value, bold in totals_rows:
+            next_y = total_y - h_total
+            c.line(page_outer_left, next_y, page_outer_right, next_y)
+            c.setFont(pdf_font_bold if bold else pdf_font_regular, 11.2 if bold else 10.8)
+            c.drawRightString(column_unit_x - 5, total_y - 12, label)
+            c.drawRightString(page_outer_right - 5, total_y - 12, f"{value:.2f}")
+            total_y = next_y
+        return total_y
 
-    # Footer details block
-    footer_top = total_y
-    footer_min_y = layout_bottom + 12
-    left_block_right = split_x + 40
-    amount_words_y = footer_top - 16
-    amount_label = "Amount In words:"
-    c.setFont(pdf_font_regular, 11)
-    c.drawString(outer_left + 4, amount_words_y, amount_label)
-    amount_label_width = c.stringWidth(f"{amount_label} ", pdf_font_regular, 11)
-    c.setFont(pdf_font_bold, 11)
-    c.drawString(outer_left + 4 + amount_label_width, amount_words_y, f"{words_currency} {words_value}.")
-    c.setFont(pdf_font_bold, 11.8)
-    c.drawString(outer_left + 4, footer_top - 34, "Mode of Payment:Cash/Cheque to GENTEC.")
+    def estimate_footer_lowest_y(
+        footer_top: float,
+        split_x_local: float,
+        page_outer_left: float,
+        page_layout_bottom: float,
+    ) -> float:
+        footer_min_y = page_layout_bottom + 12
+        left_block_right = split_x_local + 40
+        notes_y = footer_top - 68
+        note_prefixes = ["i", "ii", "iii", "iv", "v", "vi"]
+        for idx, note in enumerate(company.get("notes", []), start=1):
+            prefix = note_prefixes[idx - 1] if idx <= len(note_prefixes) else str(idx)
+            wrapped = _wrap_canvas_text(
+                c,
+                f"{prefix}) {note}",
+                left_block_right - page_outer_left - 8,
+                pdf_font_regular,
+                10.6,
+            )
+            for _line in wrapped:
+                if notes_y < footer_min_y + 48:
+                    break
+                notes_y -= 12
+            notes_y -= 2
 
-    note_heading_y = footer_top - 52
-    notes_y = note_heading_y
-    c.setFont(pdf_font_bold, 11)
-    c.drawString(outer_left + 4, notes_y, "Note:")
-    notes_y -= 16
-    note_prefixes = ["i", "ii", "iii", "iv", "v", "vi"]
-    for idx, note in enumerate(company.get("notes", []), start=1):
-        prefix = note_prefixes[idx - 1] if idx <= len(note_prefixes) else str(idx)
-        notes_y = _draw_wrapped_block(
-            c,
-            f"{prefix}) {note}",
-            outer_left + 4,
-            notes_y,
-            left_block_right - outer_left - 8,
-            footer_min_y + 48,
-            pdf_font_regular,
-            10.6,
-            12,
-        ) - 2
-
-    c.setFont(pdf_font_bold, 11)
-    bank_heading_y = max(footer_min_y + 28, notes_y)
-    c.drawString(outer_left + 4, bank_heading_y, "Bank Details:-")
-    bank_line_y = max(footer_min_y + 20, bank_heading_y - 14)
-    last_bank_line_y = bank_line_y
-    for line in company.get("bank_details", []):
-        c.setFont(pdf_font_bold, 10.8)
-        c.drawString(outer_left + 4, bank_line_y, line)
+        bank_heading_y = max(footer_min_y + 28, notes_y)
+        bank_line_y = max(footer_min_y + 20, bank_heading_y - 14)
         last_bank_line_y = bank_line_y
-        bank_line_y -= 11
+        for line in company.get("bank_details", []):
+            last_bank_line_y = bank_line_y
+            bank_line_y -= 11
 
-    # Right-side signature block.
-    c.setFont(pdf_font_bold, 13)
-    c.drawRightString(outer_right - 4, note_heading_y, "For GENTEC")
-    mobile_y = max(last_bank_line_y, layout_bottom + 18)
-    c.setFont(pdf_font_bold, 12.2)
-    c.drawRightString(outer_right - 4, mobile_y + 20, "Authorised Signatory")
-    c.setFont(pdf_font_regular, 12)
-    c.drawRightString(outer_right - 4, mobile_y, f"Mobile: {company.get('phone', '')}")
+        note_heading_y = footer_top - 52
+        mobile_y = max(last_bank_line_y, page_layout_bottom + 18)
+        return min(footer_top - 16, footer_top - 34, notes_y, last_bank_line_y, mobile_y)
 
-    border_bottom = max(layout_bottom, mobile_y - 10)
+    def draw_footer_block(
+        footer_top: float,
+        split_x_local: float,
+        page_outer_left: float,
+        page_outer_right: float,
+        page_layout_bottom: float,
+    ) -> float:
+        footer_min_y = page_layout_bottom + 12
+        left_block_right = split_x_local + 40
+        amount_words_y = footer_top - 16
+        amount_label = "Amount In words:"
+        c.setFont(pdf_font_regular, 11)
+        c.drawString(page_outer_left + 4, amount_words_y, amount_label)
+        amount_label_width = c.stringWidth(f"{amount_label} ", pdf_font_regular, 11)
+        c.setFont(pdf_font_bold, 11)
+        c.drawString(page_outer_left + 4 + amount_label_width, amount_words_y, f"{words_currency} {words_value}.")
+        c.setFont(pdf_font_bold, 11.8)
+        c.drawString(page_outer_left + 4, footer_top - 34, "Mode of Payment:Cash/Cheque to GENTEC.")
+
+        note_heading_y = footer_top - 52
+        notes_y = note_heading_y
+        c.setFont(pdf_font_bold, 11)
+        c.drawString(page_outer_left + 4, notes_y, "Note:")
+        notes_y -= 16
+        note_prefixes = ["i", "ii", "iii", "iv", "v", "vi"]
+        for idx, note in enumerate(company.get("notes", []), start=1):
+            prefix = note_prefixes[idx - 1] if idx <= len(note_prefixes) else str(idx)
+            notes_y = _draw_wrapped_block(
+                c,
+                f"{prefix}) {note}",
+                page_outer_left + 4,
+                notes_y,
+                left_block_right - page_outer_left - 8,
+                footer_min_y + 48,
+                pdf_font_regular,
+                10.6,
+                12,
+            ) - 2
+
+        c.setFont(pdf_font_bold, 11)
+        bank_heading_y = max(footer_min_y + 28, notes_y)
+        c.drawString(page_outer_left + 4, bank_heading_y, "Bank Details:-")
+        bank_line_y = max(footer_min_y + 20, bank_heading_y - 14)
+        last_bank_line_y = bank_line_y
+        for line in company.get("bank_details", []):
+            c.setFont(pdf_font_bold, 10.8)
+            c.drawString(page_outer_left + 4, bank_line_y, line)
+            last_bank_line_y = bank_line_y
+            bank_line_y -= 11
+
+        c.setFont(pdf_font_bold, 13)
+        c.drawRightString(page_outer_right - 4, note_heading_y, "For GENTEC")
+        mobile_y = max(last_bank_line_y, page_layout_bottom + 18)
+        c.setFont(pdf_font_bold, 12.2)
+        c.drawRightString(page_outer_right - 4, mobile_y + 20, "Authorised Signatory")
+        c.setFont(pdf_font_regular, 12)
+        c.drawRightString(page_outer_right - 4, mobile_y, f"Mobile: {company.get('phone', '')}")
+        return min(amount_words_y, footer_top - 34, notes_y, last_bank_line_y, mobile_y)
+
+    section1_final_page = not remaining_rows
+    draw_footer_on_section1_final_page = False
+    if section1_final_page:
+        totals_end_y = draw_totals_block(item_y, col_unit, outer_left, outer_right)
+        footer_lowest_y_est = estimate_footer_lowest_y(totals_end_y, split_x, outer_left, layout_bottom)
+        draw_footer_on_section1_final_page = footer_lowest_y_est > margin + 44
+        if draw_footer_on_section1_final_page:
+            footer_lowest_y = draw_footer_block(totals_end_y, split_x, outer_left, outer_right, layout_bottom)
+            border_bottom = max(margin + 34, max(layout_bottom, footer_lowest_y - 10))
+        else:
+            border_bottom = max(margin + 34, max(layout_bottom, totals_end_y - 10))
+    else:
+        border_bottom = max(layout_bottom, item_y - 2)
     c.setLineWidth(1.1)
     c.rect(outer_left, border_bottom, outer_width, outer_top - border_bottom)
     c.setLineWidth(0.85)
 
-    c.showPage()
+    if remaining_rows or not draw_footer_on_section1_final_page:
+        c.showPage()
 
-    # Continue only the item table on additional pages.
-    if continued_rows:
-        col_sl_w = 36
-        col_desc_w = 165
-        col_qty_w = 42
-        col_hsn_w = 64
-        col_unit_w = 98
-        current_index = first_page_capacity + 1
-        for chunk_start in range(0, len(continued_rows), continued_page_capacity):
-            chunk = continued_rows[chunk_start : chunk_start + continued_page_capacity]
+    # Continue section 1 (remaining items + totals), then place section 2 on same/next page.
+    if remaining_rows:
+        current_index = first_page_row_count + 1
+        while remaining_rows:
+            # Keep room for totals only on the final section-1 page.
+            is_final_section1_page = len(remaining_rows) <= continued_page_capacity_with_totals
+            page_capacity = (
+                continued_page_capacity_with_totals if is_final_section1_page else continued_page_capacity_without_totals
+            )
+            chunk = remaining_rows[:page_capacity]
+            remaining_rows = remaining_rows[page_capacity:]
+
             draw_background()
             page_outer_left = outer_left
             page_outer_right = outer_right
@@ -794,11 +885,12 @@ def generate_pdf(invoice: Dict[str, Any], company: Dict[str, Any], output_path: 
             c.drawString(page_outer_left, page_top, "Page continued...")
 
             table_top = page_top - 14
-            table_header_h = 27
-            row_h = 22
+            table_header_h = 24
+            row_h = 20
             table_height = table_header_h + (row_h * len(chunk))
             table_bottom = table_top - table_height
-            c.rect(page_outer_left, table_bottom, page_outer_right - page_outer_left, table_height)
+            if not is_final_section1_page:
+                c.rect(page_outer_left, table_bottom, page_outer_right - page_outer_left, table_height)
 
             c.line(page_outer_left, table_top - table_header_h, page_outer_right, table_top - table_header_h)
             c1 = page_outer_left + 34
@@ -810,30 +902,78 @@ def generate_pdf(invoice: Dict[str, Any], company: Dict[str, Any], output_path: 
                 c.line(xpos, table_top, xpos, table_bottom)
 
             c.setFont(pdf_font_bold, 10.8)
-            c.drawCentredString((page_outer_left + c1) / 2, table_top - 17, "Sl.No")
-            c.drawCentredString((c1 + c2) / 2, table_top - 17, "Description")
-            c.drawCentredString((c2 + c3) / 2, table_top - 17, "Qty")
-            c.drawCentredString((c3 + c4) / 2, table_top - 17, "HSN/SAC")
-            c.drawCentredString((c4 + c5) / 2, table_top - 15, "Unit Price")
-            c.drawCentredString((c4 + c5) / 2, table_top - 24, f"in {table_currency}")
-            c.drawCentredString((c5 + page_outer_right) / 2, table_top - 15, "Amount")
-            c.drawCentredString((c5 + page_outer_right) / 2, table_top - 24, f"in {table_currency}")
+            c.drawCentredString((page_outer_left + c1) / 2, table_top - 15, "Sl.No")
+            c.drawCentredString((c1 + c2) / 2, table_top - 15, "Description")
+            c.drawCentredString((c2 + c3) / 2, table_top - 15, "Qty")
+            c.drawCentredString((c3 + c4) / 2, table_top - 15, "HSN/SAC")
+            c.drawCentredString((c4 + c5) / 2, table_top - 13, "Unit Price")
+            c.drawCentredString((c4 + c5) / 2, table_top - 21, f"in {table_currency}")
+            c.drawCentredString((c5 + page_outer_right) / 2, table_top - 13, "Amount")
+            c.drawCentredString((c5 + page_outer_right) / 2, table_top - 21, f"in {table_currency}")
 
             c.setFont(pdf_font_regular, 11)
             row_y = table_top - table_header_h
             for row in chunk:
                 next_row_y = row_y - row_h
                 c.line(page_outer_left, next_row_y, page_outer_right, next_row_y)
-                c.drawCentredString((page_outer_left + c1) / 2, row_y - 15, str(current_index))
-                c.drawCentredString((c1 + c2) / 2, row_y - 16, row["description"])
-                c.drawCentredString((c2 + c3) / 2, row_y - 15, f"{row['qty']:g}")
-                c.drawCentredString((c3 + c4) / 2, row_y - 16, row["hsn_sac"])
-                c.drawRightString(c5 - 7, row_y - 16, f"{row['unit_price']:.2f}")
-                c.drawRightString(page_outer_right - 5, row_y - 16, f"{row['amount']:.2f}")
+                c.drawCentredString((page_outer_left + c1) / 2, row_y - 13, str(current_index))
+                c.drawCentredString((c1 + c2) / 2, row_y - 14, row["description"])
+                c.drawCentredString((c2 + c3) / 2, row_y - 13, f"{row['qty']:g}")
+                c.drawCentredString((c3 + c4) / 2, row_y - 14, row["hsn_sac"])
+                c.drawRightString(c5 - 7, row_y - 14, f"{row['unit_price']:.2f}")
+                c.drawRightString(page_outer_right - 5, row_y - 14, f"{row['amount']:.2f}")
                 row_y = next_row_y
                 current_index += 1
 
-            c.showPage()
+            if is_final_section1_page:
+                totals_end_y = draw_totals_block(table_bottom, c5, page_outer_left, page_outer_right)
+                footer_lowest_y_est = estimate_footer_lowest_y(
+                    totals_end_y,
+                    split_x,
+                    page_outer_left,
+                    base_outer_bottom,
+                )
+                draw_footer_on_section1_final_page = footer_lowest_y_est > margin + 44
+                if draw_footer_on_section1_final_page:
+                    footer_lowest_y = draw_footer_block(
+                        totals_end_y,
+                        split_x,
+                        page_outer_left,
+                        page_outer_right,
+                        base_outer_bottom,
+                    )
+                    border_bottom = max(margin + 34, max(base_outer_bottom, footer_lowest_y - 10))
+                else:
+                    border_bottom = max(margin + 34, max(base_outer_bottom, totals_end_y - 10))
+                c.setLineWidth(1.1)
+                c.rect(page_outer_left, border_bottom, page_outer_right - page_outer_left, table_top - border_bottom)
+                c.setLineWidth(0.85)
+            else:
+                c.setLineWidth(1.1)
+                c.rect(page_outer_left, table_bottom, page_outer_right - page_outer_left, table_height)
+                c.setLineWidth(0.85)
+
+            if remaining_rows or (is_final_section1_page and not draw_footer_on_section1_final_page):
+                c.showPage()
+
+    # Section 2 must move to next page if it did not fit with section 1.
+    if not draw_footer_on_section1_final_page:
+        draw_background()
+        page_outer_left = outer_left
+        page_outer_right = outer_right
+        page_top = top_y - (stationery_top_offset if letterhead_path else 54)
+        footer_top = page_top - 20
+        footer_lowest_y = draw_footer_block(
+            footer_top,
+            split_x,
+            page_outer_left,
+            page_outer_right,
+            base_outer_bottom,
+        )
+        border_bottom = max(margin + 34, max(base_outer_bottom, footer_lowest_y - 10))
+        c.setLineWidth(1.1)
+        c.rect(page_outer_left, border_bottom, page_outer_right - page_outer_left, page_top - border_bottom)
+        c.setLineWidth(0.85)
 
     c.save()
 
@@ -1165,6 +1305,6 @@ def delete_invoice(invoice_id: str) -> Any:
 
 if __name__ == "__main__":
     ensure_seed_data()
-    port = int(os.getenv("PORT", "5000"))
+    port = int(os.getenv("PORT", "5010"))
     debug = os.getenv("FLASK_DEBUG", "1") == "1"
     app.run(host="0.0.0.0", port=port, debug=debug)
