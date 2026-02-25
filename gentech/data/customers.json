@@ -1,9 +1,9 @@
 [
   {
     "customer_id": "CUST001",
-    "name": "Saaral Family Restaurant",
-    "address": "34-F1, Karupparayan Kovil Street, Samalapuram, Palladam, Tiruppur - 641663",
-    "gstin": "33FXEPS2789N1ZL",
-    "reference_default": "Mahindra 15Kva"
+    "name": "test test tgest",
+    "address": "34-F1, ABCDFFFFF uytw Street, Test, Test, Test - 000000",
+    "gstin": "gstin",
+    "reference_default": "TEST 15Kva"
   }
 ]
