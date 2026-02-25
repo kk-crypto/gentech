@@ -1,7 +1,7 @@
 {
-  "company_name": "GENTEC",
-  "gstin": "33AXQPM7524G1Z8",
-  "phone": "+91 8056789568",
+  "company_name": "company_name",
+  "gstin": "gstin",
+  "phone": "+91 1234567890",
   "invoice_prefix": "DGSP",
   "job_card_prefix": "GEN/CBE",
   "max_rows_per_invoice": 8,
@@ -9,15 +9,15 @@
   "bank_details": [
     "A/c Name: Gentec",
     "Bank Name: Karur Vysya Bank",
-    "A/c No: 1294135000006393",
-    "Branch & IFS Code: Kovaipudur & KVBL0001294"
+    "A/c No: 12345678901234",
+    "Branch & IFS Code: IFSC & ABCD0000000"
   ],
   "notes": [
     "Goods once sold will not be taken back.",
     "Interest @18% will be charged on unpaid amount after 45 days of invoice date."
   ],
   "logo_path": "letterhead.jpeg",
-  "header_phone_line": "Mob : 80567 89568, 91235 87990",
-  "header_email": "E-mail : support@gentec.in",
-  "header_website": "WebSite : www.gentecpowertechnologies.com"
+  "header_phone_line": "Mob : 12345 12345, 12345 12345",
+  "header_email": "E-mail : support@test.in",
+  "header_website": "WebSite : www.test.com"
 }
